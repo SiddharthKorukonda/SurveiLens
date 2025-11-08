@@ -1,0 +1,27 @@
+{
+  "nodes": [
+    {
+      "id": "cam-a"
+    },
+    {
+      "id": "cam-b"
+    },
+    {
+      "id": "cam-c"
+    }
+  ],
+  "edges": [
+    [
+      "cam-a",
+      "cam-b"
+    ],
+    [
+      "cam-b",
+      "cam-c"
+    ],
+    [
+      "cam-a",
+      "cam-c"
+    ]
+  ]
+}

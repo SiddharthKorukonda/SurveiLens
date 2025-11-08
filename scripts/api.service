@@ -1,0 +1,13 @@
+[Unit]
+Description=SurveiLens API
+After=network.target
+
+[Service]
+User=www-data
+WorkingDirectory=/opt/surveilens
+EnvironmentFile=/opt/surveilens/.env
+ExecStart=/opt/surveilens/venv/bin/gunicorn -w 2 -b 0.0.0.0:8000 backend.app:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
