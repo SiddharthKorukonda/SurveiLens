@@ -1,0 +1,5 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root{ --bg: #0b0f14; }
+body{ background: radial-gradient(1200px 600px at 50% -10%, rgba(0,255,156,0.08), transparent 70%), var(--bg); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji; }

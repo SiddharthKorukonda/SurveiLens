@@ -1,0 +1,13 @@
+[Unit]
+Description=SurveiLens Worker
+After=network.target redis.service
+
+[Service]
+User=www-data
+WorkingDirectory=/opt/surveilens
+EnvironmentFile=/opt/surveilens/.env
+ExecStart=/opt/surveilens/venv/bin/celery -A backend.tasks.celery worker -l info
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
