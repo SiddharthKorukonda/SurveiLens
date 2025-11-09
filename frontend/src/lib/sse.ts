@@ -1,33 +1,51 @@
+import { cfg } from "./config";
+
+/**
+ * Connect to server-sent events for ALERTS.
+ * Backend endpoint: GET {API_BASE}/servers/:id/events  (text/event-stream)
+ */
 export function connectEvents(serverId: string, onEvent: (e: any) => void) {
-// Mocked stream: emits an alert every ~4–8 seconds
-let alive = true
-const levels = ["LOW", "MED", "HIGH"]
-const cams = ["cam-a", "cam-b", "cam-c", "cam-d"]
+  let es: EventSource | null = null;
 
+  if (cfg.USE_BACKEND) {
+    const url = `${cfg.API_BASE}/servers/${encodeURIComponent(serverId)}/events`;
+    es = new EventSource(url);
+    es.onmessage = (ev) => {
+      try {
+        const payload = JSON.parse(ev.data);
+        onEvent(payload);
+      } catch (e) {
+        // ignore malformed lines
+      }
+    };
+    es.onerror = () => {
+      // Let the browser retry automatically
+    };
+    return () => es?.close();
+  }
 
-async function loop() {
-while (alive) {
-await new Promise((r) => setTimeout(r, 3500 + Math.random() * 3000))
-const lvl = levels[Math.floor(Math.random() * levels.length)]
-const payload = {
-type: "alert",
-alert: {
-alert_id: Math.random().toString(36).slice(2),
-camera_id: cams[Math.floor(Math.random() * cams.length)],
-created_at: Date.now(),
-danger_level: lvl,
-danger_score: Math.floor(50 + Math.random() * 50),
-confidence: Number((0.5 + Math.random() * 0.5).toFixed(2)),
-reason: lvl === "HIGH" ? "Weapon-like object detected" : lvl === "MED" ? "Unusual motion pattern" : "Noise spike",
-},
-}
-onEvent(payload)
-}
+  // No mocks. No random generation.
+  console.warn("connectEvents: backend disabled and mocks disabled; no alerts will be received.");
+  return () => {};
 }
 
-
-loop()
-return () => {
-alive = false
-}
+/**
+ * Connect to server-sent events for LOGS.
+ * Backend endpoint: GET {API_BASE}/servers/:id/logs  (text/event-stream)
+ */
+export function connectLogs(serverId: string, onLine: (line: string) => void) {
+  if (!cfg.USE_BACKEND) {
+    console.warn("connectLogs: backend disabled; no logs will be received.");
+    return () => {};
+  }
+  const url = `${cfg.API_BASE}/servers/${encodeURIComponent(serverId)}/logs`;
+  const es = new EventSource(url);
+  es.onmessage = (ev) => {
+    try {
+      const line = ev.data as string;
+      if (line) onLine(line);
+    } catch {}
+  };
+  es.onerror = () => {};
+  return () => es.close();
 }

@@ -1,61 +1,93 @@
-import React, { useEffect, useMemo, useState } from "react"
-import { useParams } from "react-router-dom"
-import { useStore } from "../lib/state"
-import MetricsPanel from "../components/MetricsPanel"
-import VideoTile from "../components/VideoTile"
-import { connectEvents } from "../lib/sse"
-import AlertCard from "../components/AlertCard"
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
+import { useStore } from "../lib/state";
+import { connectEvents } from "../lib/sse";
+import BackButton from "../components/BackButton";
+import VideoTile from "../components/VideoTile";
+import AlertCard from "../components/AlertCard";
 
+type Toast = { id: string; a: any; at: number };
 
 export default function ServerAnalyze() {
-const { id } = useParams()
-const server = useStore((s) => s.servers.find((x) => x.id === id))
-const [alerts, setAlerts] = useState<any[]>([])
+  const { id } = useParams();
+  const server = useStore((s) => s.servers.find((x) => x.id === id));
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const endRef = useRef<HTMLDivElement>(null);
 
+  // health stub (you can wire to backend /servers/:id/health)
+  const health = useMemo(() => {
+    return {
+      status: "Healthy",
+      cams: server?.cameras.length ?? 0,
+      started: server ? new Date(server.createdAt).toLocaleString() : "",
+    };
+  }, [server]);
 
-useEffect(() => {
-if (!server) return
-const off = connectEvents(server.id, (e) => {
-if (e?.type === "alert") setAlerts((a) => [e.alert, ...a].slice(0, 50))
-})
-return off
-}, [server?.id])
+  useEffect(() => {
+    if (!id) return;
+    return connectEvents(id, (payload) => {
+      if (payload?.type === "alert") {
+        const a = payload.alert || payload;
+        const level = a.danger_level || a.level;
+        if (level === "HIGH" || level === "MED") {
+          setToasts((arr) => [
+            ...arr,
+            { id: a.alert_id || Math.random().toString(36).slice(2), a, at: Date.now() },
+          ]);
+        }
+      }
+    });
+  }, [id]);
 
+  useEffect(() => {
+    const t = setInterval(() => {
+      const now = Date.now();
+      setToasts((arr) => arr.filter((x) => now - x.at < 8000)); // auto-dismiss after 8s
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
 
-const metrics = useMemo(() => ({ latencyMs: 110, fps: 29, resolution: "1280×720", dropped: 0 }), [])
+  const cams = server?.cameras ?? [];
+  const cols = Math.min(3, Math.max(1, Math.ceil(Math.sqrt(cams.length))));
+  const gridCls = `grid grid-cols-1 gap-3 md:grid-cols-${cols}`;
 
+  return (
+    <div className="relative h-[calc(100vh-72px)] w-full p-3">
+      <div className="mb-2 flex items-center justify-between px-1">
+        <BackButton label="Back" />
+        <div className="text-lg font-semibold">Video Surveillance</div>
+        <div />
+      </div>
 
-if (!server) return <div className="p-6">Server not found.</div>
+      {/* Video wall */}
+      <div className={`${gridCls} h-[calc(100%-3rem)] overflow-auto`}>
+        {cams.map((c) => (
+          <VideoTile key={c.id} label={c.label} streamUrl={c.streamUrl} />
+        ))}
+        {cams.length === 0 && (
+          <div className="flex h-full items-center justify-center rounded-xl border border-white/10 bg-white/5 p-6 text-white/70">
+            No cameras configured.
+          </div>
+        )}
+      </div>
 
+      {/* Health small box top-left */}
+      <div className="pointer-events-none absolute left-3 top-[4.25rem] rounded-xl border border-white/10 bg-black/50 p-3 text-xs backdrop-blur">
+        <div className="font-semibold">Server Health</div>
+        <div className="opacity-80">Status: {health.status}</div>
+        <div className="opacity-80">Cameras: {health.cams}</div>
+        <div className="opacity-80">{health.started}</div>
+      </div>
 
-return (
-<div className="mx-auto max-w-6xl p-6">
-<div className="mb-2 text-sm text-white/70">Live video wall from paired devices. Click Info on a tile for diagnostics.</div>
-<div className="mb-4 text-2xl font-bold">{server.name}</div>
-
-
-<div className="grid grid-cols-4 gap-4">
-<div className="col-span-3 grid grid-cols-2 gap-3">
-{server.cameras.slice(0, 4).map((c) => (
-<div key={c.id} className="h-52 md:h-64 lg:h-72">
-<VideoTile label={`${c.label} (${c.id})`} streamUrl={c.streamUrl} metrics={metrics} />
-</div>
-))}
-</div>
-<div className="col-span-1 space-y-4">
-<MetricsPanel latency={metrics.latencyMs} queue={Math.max(0, 4 - alerts.length % 4)} />
-<div className="space-y-2">
-<div className="text-lg font-semibold">Live Alerts</div>
-<div className="space-y-2">
-{alerts.length === 0 ? (
-<div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/70">No alerts yet.</div>
-) : (
-alerts.map((a) => <AlertCard a={a} key={a.alert_id} />)
-)}
-</div>
-</div>
-</div>
-</div>
-</div>
-)
+      {/* MED/HIGH toasts top-right */}
+      <div className="pointer-events-none absolute right-3 top-[4.25rem] flex w-[340px] flex-col gap-2">
+        {toasts.map((t) => (
+          <div key={t.id} className="pointer-events-auto">
+            <AlertCard a={t.a} />
+          </div>
+        ))}
+        <div ref={endRef} />
+      </div>
+    </div>
+  );
 }
