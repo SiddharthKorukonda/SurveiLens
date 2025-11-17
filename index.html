@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SurveiLens Camera Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* (styles unchanged) */
+    body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#050816;color:#f9fafb;display:flex;flex-direction:column;min-height:100vh}
+    header{padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;background:rgba(15,23,42,.95);border-bottom:1px solid rgba(148,163,184,.3);position:sticky;top:0;z-index:10}
+    .title{font-size:1.1rem;font-weight:600;display:flex;align-items:center;gap:.5rem}
+    .pill{font-size:.75rem;padding:.1rem .5rem;border-radius:9999px;background:rgba(59,130,246,.15);color:#bfdbfe;border:1px solid rgba(59,130,246,.5)}
+    .controls{display:flex;gap:.5rem;align-items:center;font-size:.85rem;color:#9ca3af;flex-wrap:wrap;justify-content:flex-end}
+    .row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+    input[type=text],input[type=number]{background:rgba(15,23,42,.9);border:1px solid rgba(75,85,99,.8);border-radius:9999px;padding:.3rem .75rem;color:inherit;font-size:.8rem;min-width:6rem}
+    input::placeholder{color:#6b7280}
+    button{border-radius:9999px;border:1px solid rgba(59,130,246,.7);background:rgba(37,99,235,.85);color:#e5e7eb;font-size:.85rem;padding:.35rem .9rem;cursor:pointer;display:inline-flex;align-items:center;gap:.35rem}
+    button.secondary{background:transparent;border-color:rgba(148,163,184,.7)}
+    button.warn{border-color:rgba(239,68,68,.7);background:rgba(239,68,68,.2)}
+    button:disabled{opacity:.5;cursor:default}
+    main{flex:1;display:flex;align-items:center;justify-content:center;padding:1.5rem}
+    .card{width:100%;max-width:1024px;background:radial-gradient(circle at top,rgba(56,189,248,.12),transparent 55%),radial-gradient(circle at bottom,rgba(129,140,248,.1),transparent 55%),rgba(15,23,42,.95);border-radius:1.5rem;padding:1.25rem;border:1px solid rgba(148,163,184,.4);box-shadow:0 20px 40px rgba(15,23,42,.7);display:flex;flex-direction:column;gap:1rem}
+    video{width:100%;max-height:70vh;border-radius:1rem;background:#020617;display:block}
+    .status-bar{display:flex;flex-wrap:wrap;gap:.75rem;font-size:.8rem;color:#9ca3af;align-items:center;justify-content:space-between}
+    .status-dot{width:.6rem;height:.6rem;border-radius:9999px;margin-right:.35rem;background:#4b5563}
+    .status-dot.live{background:#22c55e;box-shadow:0 0 0 6px rgba(34,197,94,.25)}
+    .status-group{display:inline-flex;align-items:center;gap:.4rem}
+    .badge{padding:.15rem .55rem;border-radius:9999px;border:1px solid rgba(148,163,184,.4);font-size:.75rem;color:#e5e7eb;background:rgba(15,23,42,.9)}
+    .pill-soft{padding:.15rem .55rem;border-radius:9999px;background:rgba(31,41,55,.9);border:1px solid rgba(55,65,81,.8)}
+    a{color:#93c5fd;text-decoration:none;font-size:.75rem}
+    a:hover{text-decoration:underline}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    .small{font-size:.75rem;color:#9ca3af}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">
+      <span>🎥 SurveiLens Viewer</span>
+      <span class="pill">Control</span>
+    </div>
+
+    <div class="controls">
+      <div class="row">
+        <span class="small">Source:</span>
+        <input id="source-input" type="text" placeholder="0 or rtsp://..." />
+        <span class="small">YOLO:</span>
+        <input id="weights-input" type="text" placeholder="yolo11n.pt" style="min-width:7.5rem" />
+        <span class="small">Conf:</span>
+        <input id="conf-input" type="number" step="0.01" min="0" max="1" placeholder="0.25" style="width:5.5rem" />
+        <button id="start-btn">Start Detection</button>
+        <button id="stop-btn" class="warn" disabled>Stop</button>
+      </div>
+      <div class="row">
+        <span>Room:</span>
+        <input id="room-input" type="text" placeholder="cam-1" />
+        <button id="connect-btn"><span id="connect-label">Connect</span></button>
+        <button id="disconnect-btn" class="secondary" disabled>Disconnect</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <video id="video" playsinline autoplay muted></video>
+
+      <div class="status-bar">
+        <div class="status-group">
+          <span id="status-dot" class="status-dot"></span>
+          <span id="status-text">Disconnected</span>
+        </div>
+        <div class="status-group">
+          <span class="badge" id="conn-state">PC: —</span>
+          <span class="badge" id="ice-state">ICE: —</span>
+          <span class="pill-soft" id="bitrate">Bitrate: —</span>
+        </div>
+        <a href="#" id="debug-toggle">Show debug log</a>
+      </div>
+
+      <div class="grid">
+        <pre id="debug-log" style="display:none;max-height:240px;overflow-y:auto;font-size:0.7rem;background:rgba(15,23,42,.95);border-radius:.75rem;padding:.75rem;border:1px solid rgba(30,64,175,.7);"></pre>
+
+        <div class="pill-soft" style="padding:0.75rem">
+          <div class="small" style="margin-bottom:0.4rem">Pipeline status</div>
+          <div id="pipe-running" class="badge">running: —</div>
+          <div id="pipe-uptime" class="badge">uptime: —</div>
+          <div id="pipe-pid" class="badge">pid: —</div>
+          <div class="small" style="margin-top:0.5rem">Args:</div>
+          <pre id="pipe-args" style="font-size:0.7rem;margin:0;white-space:pre-wrap;"></pre>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // =========================
+    // CONFIG
+    // =========================
+    const API_BASE = "http://localhost:8000";    // FastAPI HTTP
+    const SIGNALING_URL = "ws://localhost:8000/ws"; // FastAPI WS
+    const SHARED_SECRET = "CHANGE_ME_SHARED_SECRET"; // must match server
+
+    // ICE servers (keep simple for localhost)
+    const ICE_SERVERS = [{ urls: ["stun:stun.l.google.com:19302"] }];
+
+    // =========================
+    // DOM
+    // =========================
+    const videoEl = document.getElementById("video");
+    const roomInput = document.getElementById("room-input");
+    const connectBtn = document.getElementById("connect-btn");
+    const connectLabel = document.getElementById("connect-label");
+    const disconnectBtn = document.getElementById("disconnect-btn");
+    const statusDot = document.getElementById("status-dot");
+    const statusText = document.getElementById("status-text");
+    const connStateEl = document.getElementById("conn-state");
+    const iceStateEl = document.getElementById("ice-state");
+    const bitrateEl = document.getElementById("bitrate");
+    const debugLog = document.getElementById("debug-log");
+    const debugToggle = document.getElementById("debug-toggle");
+
+    const startBtn = document.getElementById("start-btn");
+    const stopBtn = document.getElementById("stop-btn");
+    const sourceInput = document.getElementById("source-input");
+    const weightsInput = document.getElementById("weights-input");
+    const confInput = document.getElementById("conf-input");
+
+    const pipeRunningEl = document.getElementById("pipe-running");
+    const pipeUptimeEl = document.getElementById("pipe-uptime");
+    const pipePidEl = document.getElementById("pipe-pid");
+    const pipeArgsEl = document.getElementById("pipe-args");
+
+    // Fill room from URL
+    const params = new URLSearchParams(window.location.search);
+    roomInput.value = params.get("room") || "cam-1";
+
+    // Defaults for detection controls
+    sourceInput.value = "0";
+    weightsInput.value = "yolo11n.pt";
+    confInput.value = "0.25";
+
+    // =========================
+    // Helpers
+    // =========================
+    function log(...args) {
+      console.log("[viewer]", ...args);
+      debugLog.textContent += args.map(String).join(" ") + "\n";
+      debugLog.scrollTop = debugLog.scrollHeight;
+    }
+    function setStatus(label, live) {
+      statusText.textContent = label;
+      statusDot.classList.toggle("live", !!live);
+    }
+
+    async function api(path, options) {
+      const rsp = await fetch(API_BASE + path, {
+        method: options?.method || "GET",
+        headers: { "Content-Type": "application/json", ...(options?.headers || {}) },
+        body: options?.body ? JSON.stringify(options.body) : undefined,
+      });
+      if (!rsp.ok) {
+        const text = await rsp.text();
+        throw new Error(`HTTP ${rsp.status}: ${text}`);
+      }
+      return rsp.json();
+    }
+
+    async function refreshStatus() {
+      try {
+        const s = await api("/pipeline/status");
+        pipeRunningEl.textContent = "running: " + String(s.running);
+        pipeUptimeEl.textContent = "uptime: " + (s.uptime_sec != null ? s.uptime_sec.toFixed(1) + "s" : "—");
+        pipePidEl.textContent = "pid: " + (s.pid ?? "—");
+        pipeArgsEl.textContent = s.args ? JSON.stringify(s.args, null, 2) : "—";
+        stopBtn.disabled = !s.running;
+      } catch {
+        pipeRunningEl.textContent = "running: —";
+        pipeUptimeEl.textContent = "uptime: —";
+        pipePidEl.textContent = "pid: —";
+        pipeArgsEl.textContent = "—";
+        stopBtn.disabled = true;
+      }
+    }
+
+    async function startDetection() {
+      startBtn.disabled = true;
+      try {
+        const body = {
+          source: document.getElementById("source-input").value.trim() || 0,
+          yolo_weights: document.getElementById("weights-input").value.trim() || "yolo11n.pt",
+          conf: parseFloat(document.getElementById("conf-input").value || "0.25"),
+        };
+        const rsp = await fetch("http://localhost:8000/start", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(body),
+        });
+        if (!rsp.ok) throw new Error(await rsp.text());
+      } catch (e) {
+        alert("Failed to start: " + e.message);
+      } finally {
+        startBtn.disabled = false;
+      }
+    }
+
+
+    async function stopDetection() {
+      stopBtn.disabled = true;
+      try {
+        await api("/pipeline/stop", { method: "POST" });
+        log("Detection stopped");
+      } catch (e) {
+        alert("Failed to stop: " + e.message);
+      } finally {
+        refreshStatus();
+      }
+    }
+
+    // Poll status every few seconds
+    setInterval(refreshStatus, 3000);
+    refreshStatus();
+
+    // =========================
+    // WebRTC viewer (uses SIGNALING_URL)
+    // =========================
+    let pc = null, ws = null, room = null, statsTimer = null;
+
+    function setButtons(connected) {
+      connectBtn.disabled = connected;
+      disconnectBtn.disabled = !connected;
+      connectLabel.textContent = connected ? "Connected" : "Connect";
+    }
+    function updatePCState() {
+      if (!pc) { connStateEl.textContent = "PC: —"; iceStateEl.textContent = "ICE: —"; return; }
+      connStateEl.textContent = "PC: " + (pc.connectionState || "unknown");
+      iceStateEl.textContent = "ICE: " + (pc.iceConnectionState || "unknown");
+    }
+    function startStats() {
+      stopStats();
+      if (!pc) return;
+      statsTimer = setInterval(async () => {
+        try {
+          const stats = await pc.getStats();
+          let total = 0;
+          stats.forEach((r) => {
+            if (r.type === "inbound-rtp" && r.kind === "video" && r.bytesReceived && r.timestamp) {
+              if (!r._prevBytes) { r._prevBytes = r.bytesReceived; r._prevTs = r.timestamp; }
+              else {
+                const deltaBytes = r.bytesReceived - r._prevBytes;
+                const deltaTime = (r.timestamp - r._prevTs) / 1000;
+                if (deltaTime > 0) total = (deltaBytes * 8) / deltaTime;
+                r._prevBytes = r.bytesReceived; r._prevTs = r.timestamp;
+              }
+            }
+          });
+          if (total > 0) bitrateEl.textContent = `Bitrate: ${(total/1000).toFixed(1)} kbps`;
+        } catch {}
+      }, 2000);
+    }
+    function stopStats() { if (statsTimer) clearInterval(statsTimer); statsTimer = null; bitrateEl.textContent = "Bitrate: —"; }
+    function send(msg) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ ...msg, room })); }
+
+    function createPeerConnection() {
+      pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          send({ type: "ice-candidate", candidate: {
+            candidate: event.candidate.candidate,
+            sdpMid: event.candidate.sdpMid,
+            sdpMLineIndex: event.candidate.sdpMLineIndex,
+          }});
+        }
+      };
+      pc.ontrack = (event) => {
+        log("Got track", event.track.kind);
+        if (event.streams && event.streams[0]) {
+          videoEl.srcObject = event.streams[0];
+        } else {
+          const inboundStream = new MediaStream();
+          inboundStream.addTrack(event.track);
+          videoEl.srcObject = inboundStream;
+        }
+        // <-- make sure the element actually starts playing
+        const p = videoEl.play();
+        if (p && typeof p.then === "function") {
+          p.catch(() => {/* ignore autoplay race */});
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        log("PC connectionState:", pc.connectionState);
+        updatePCState();
+        if (pc.connectionState === "connected") { setStatus("Live", true); startStats(); }
+        else if (pc.connectionState === "failed" || pc.connectionState === "disconnected") { setStatus("Disconnected", false); stopStats(); }
+      };
+      pc.oniceconnectionstatechange = () => { log("ICE state:", pc.iceConnectionState); updatePCState(); };
+      updatePCState();
+      return pc;
+    }
+
+    async function handleOffer(msg) {
+      log("Received offer");
+      if (!pc) createPeerConnection();
+      await pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: msg.sdp }));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      send({ type: "answer", sdp: pc.localDescription.sdp });
+      log("Sent answer");
+    }
+
+    async function handleIceCandidate(msg) {
+      if (!pc || !msg.candidate) return;
+      try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); }
+      catch (e) { log("Error adding ICE candidate:", e); }
+    }
+
+    function cleanupConnection() {
+      stopStats();
+      if (pc) { try { pc.close(); } catch {} pc = null; }
+      if (ws) { try { ws.close(); } catch {} ws = null; }
+      videoEl.srcObject = null;
+      setStatus("Disconnected", false);
+      setButtons(false);
+      updatePCState();
+    }
+
+    function connect() {
+      if (ws && ws.readyState === WebSocket.OPEN) return;
+      room = roomInput.value.trim() || "cam-1";
+      debugLog.textContent = "";
+      setStatus("Connecting…", false);
+      setButtons(true);
+      updatePCState();
+
+      ws = new WebSocket(SIGNALING_URL);
+      ws.onopen = () => {
+        log("WS connected");
+        setStatus("Waiting for stream…", false);
+        ws.send(JSON.stringify({ type: "register", role: "viewer", room, token: SHARED_SECRET }));
+      };
+      ws.onmessage = async (event) => {
+        let msg; try { msg = JSON.parse(event.data); } catch { return; }
+        if (msg.room && msg.room !== room) return;
+        if (msg.type === "offer") await handleOffer(msg);
+        else if (msg.type === "ice-candidate") await handleIceCandidate(msg);
+        else log("WS msg:", msg);
+      };
+      ws.onerror = (event) => { log("WS error:", event); setStatus("WebSocket error", false); };
+      ws.onclose = () => { log("WS closed"); cleanupConnection(); };
+    }
+
+    // =========================
+    // UI events
+    // =========================
+    startBtn.addEventListener("click", startDetection);
+    stopBtn.addEventListener("click", stopDetection);
+    connectBtn.addEventListener("click", connect);
+    disconnectBtn.addEventListener("click", cleanupConnection);
+
+    debugToggle.addEventListener("click", (e) => {
+      e.preventDefault();
+      const isHidden = debugLog.style.display === "none";
+      debugLog.style.display = isHidden ? "block" : "none";
+      debugToggle.textContent = isHidden ? "Hide debug log" : "Show debug log";
+    });
+
+    // Optional: auto-connect if ?autoconnect=1
+    if (params.get("autoconnect") === "1") setTimeout(() => connect(), 300);
+  </script>
+</body>
+</html>
