@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from fractions import Fraction
@@ -30,6 +31,8 @@ IMG_SIZE = int(os.getenv("IMG_SIZE", "640"))
 FPS = int(os.getenv("FPS", "30"))
 DEFAULT_WEIGHTS = os.getenv("YOLO_WEIGHTS", "yolo11n.pt")
 DEFAULT_CONF = float(os.getenv("YOLO_CONF", "0.25"))
+ALERTS_JSONL_PATH = os.getenv("ALERTS_JSONL", "alerts.jsonl")
+MAX_ALERTS_RETURNED = int(os.getenv("MAX_ALERTS_RETURNED", "250"))
 YOLO_DEVICE = os.getenv("YOLO_DEVICE", None)  # "cpu", "mps", "cuda", or index
 
 # Danger label config
@@ -105,6 +108,28 @@ def _status_payload():
         "args": {"VIDEO_SOURCE": _source, "IMG_SIZE": IMG_SIZE, "FPS": FPS,
                  "YOLO_WEIGHTS": _yolo_weights, "YOLO_CONF": _yolo_conf},
     }
+
+
+def _read_alerts_from_file(limit: int = MAX_ALERTS_RETURNED):
+    if not os.path.exists(ALERTS_JSONL_PATH):
+        return []
+    rows = []
+    try:
+        with open(ALERTS_JSONL_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except Exception:
+                    continue
+    except Exception as e:
+        print(f"[WARN] Failed to read alerts JSONL: {e}")
+        return []
+    if limit and limit > 0:
+        rows = rows[-limit:]
+    return list(reversed(rows))
 
 def _load_model(weights: str):
     global _yolo
@@ -263,6 +288,19 @@ def api_pipeline_stop():
 @app.get("/pipeline/status")
 def api_pipeline_status():
     return _status_payload()
+
+
+@app.get("/alerts")
+def api_alerts(limit: int = MAX_ALERTS_RETURNED):
+    data = _read_alerts_from_file(limit)
+    return JSONResponse(data, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/alerts.jsonl")
+def api_alerts_file(limit: int = MAX_ALERTS_RETURNED):
+    data = _read_alerts_from_file(limit)
+    body = "\n".join(json.dumps(item, ensure_ascii=False) for item in data)
+    return PlainTextResponse(body, headers={"Cache-Control": "no-store"})
 
 # Friendly aliases used by your page
 @app.post("/start")
