@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SurveiLens</title>
+  <link rel="stylesheet" href="./assets/styles.css" />
+</head>
+<body>
+  <header>
+    <div class="title">
+      <strong>🛰️ SurveiLens</strong>
+      <span class="pill">Home</span>
+    </div>
+    <nav class="nav-links">
+      <a href="./index.html">Home</a>
+      <a href="./control.html">Control</a>
+      <a href="./alerts.html">Alerts</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="page">
+      <section class="card" style="display:flex;flex-direction:column;gap:1.5rem;">
+        <div class="hero">
+          <p class="pill">AI camera intelligence</p>
+          <h1>Real-time situational awareness for every feed.</h1>
+          <p class="tagline">Launch detections, orchestrate WebRTC viewers, and review alert history from a single glassy console.</p>
+          <div class="actions">
+            <a class="card-link" style="max-width:280px; text-align:center;" href="./control.html">
+              <strong>🚀 Launch Control</strong>
+              <span style="color:#cbd5f5;font-size:0.9rem;">Start/stop YOLO, manage rooms, connect viewers.</span>
+            </a>
+            <a class="card-link" style="max-width:280px; text-align:center;" href="./alerts.html">
+              <strong>⚡ View Alerts</strong>
+              <span style="color:#cbd5f5;font-size:0.9rem;">Filter high-danger events with live polling.</span>
+            </a>
+          </div>
+        </div>
+
+        <section class="grid">
+          <div class="pill-soft">
+            <div class="small" style="margin-bottom:0.35rem;">Pipeline status</div>
+            <div id="home-running" class="badge">Checking…</div>
+            <div class="small" style="margin:0.5rem 0 0.25rem;">Uptime</div>
+            <div id="home-uptime" class="badge">—</div>
+            <div class="small" id="home-status-msg" style="margin-top:0.75rem;color:#94a3b8;">Fetching status…</div>
+          </div>
+          <div class="pill-soft">
+            <div class="small" style="margin-bottom:0.5rem;">Pro tips</div>
+            <ul style="margin:0;padding-left:1rem;color:#cbd5f5;font-size:0.95rem;line-height:1.6;">
+              <li>Append <code>?room=cam-1&amp;autoconnect=1</code> to auto-join a stream.</li>
+              <li>Alerts page auto-detects <code>/alerts</code> or local <code>alerts.jsonl</code>.</li>
+              <li>All calls stay on <code>http://localhost:8000</code> / <code>ws://localhost:8000/ws</code>.</li>
+            </ul>
+          </div>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="./js/home-page.js"></script>
+</body>
+</html>
