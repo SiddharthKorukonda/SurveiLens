@@ -1,0 +1,10 @@
+# requiremengts.txt
+
+fastapi
+uvicorn[standard]
+aiortc
+av
+opencv-python
+numpy
+pydantic
+python-multipart
