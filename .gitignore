@@ -1,0 +1,92 @@
+# --- OS / editors ---
+.DS_Store
+.AppleDouble
+.Trashes
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Env & secrets (keep the template) ---
+.env
+.env.*
+!.env.example
+
+# --- Logs & temp ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.pid
+*.pid.lock
+tmp/
+temp/
+cache/
+coverage/
+*.coverage
+*.lcov
+*.out
+
+# Runtime JSON logs
+json-logs/
+
+# --- Frontend (React + Vite) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.cache/
+frontend/coverage/
+
+# --- Rust (control-plane) ---
+control-plane/target/
+control-plane/.cargo/
+
+# --- C++ (video-core) ---
+video-core/build/
+video-core/out/
+video-core/bin/
+video-core/obj/
+video-core/CMakeCache.txt
+video-core/CMakeFiles/
+video-core/cmake-build-*/
+video-core/*.dSYM/
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
+
+# --- Python tools ---
+py-tools/.venv/
+py-tools/__pycache__/
+py-tools/*.pyc
+py-tools/.mypy_cache/
+py-tools/.pytest_cache/
+py-tools/.ruff_cache/
+
+# --- Models (generated artifacts; keep weights if you want) ---
+models/**/*.engine
+models/**/*.plan
+models/**/*.trt
+models/**/calib.cache
+# Optional (uncomment to ignore raw weights too)
+# models/**/*.pt
+# models/**/*.onnx
+
+# --- Media / HLS segments (if you enable preview) ---
+hls/
+*.m3u8
+*.ts
+
+# --- Docker / Compose local state ---
+docker/*.env
+deploy/**/.env
+compose-data/
+.volumes/
+
+# --- Generic roots (if created) ---
+build/
+cmake-build-*/
+target/
