@@ -9,7 +9,9 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi import Request
 from pydantic import BaseModel
 
 from fractions import Fraction
@@ -354,3 +356,24 @@ async def _await_ice_complete(pc: RTCPeerConnection, timeout=3.0):
         await asyncio.wait_for(done, timeout=timeout)
     except asyncio.TimeoutError:
         pass
+
+# Serve static files - catch-all route (must be last)
+@app.get("/{path:path}")
+async def serve_static(request: Request, path: str):
+    # API routes are handled above, so this only catches non-API paths
+    import os
+    # Remove leading slash and "public/" prefix if present
+    path = path.lstrip("/")
+    if path.startswith("public/"):
+        path = path[7:]  # Remove "public/" prefix
+    # If path is empty, serve index.html
+    if not path:
+        file_path = os.path.join("public", "index.html")
+    else:
+        file_path = os.path.join("public", path)
+    # If file doesn't exist or is a directory, try index.html
+    if not os.path.exists(file_path) or os.path.isdir(file_path):
+        file_path = os.path.join("public", "index.html")
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return FileResponse(file_path)
+    return FileResponse(os.path.join("public", "index.html"))

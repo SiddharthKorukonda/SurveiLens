@@ -25,6 +25,11 @@ Thumbs.db
 *.log
 *.pt
 !yolo11n.pt
+vcpkg/
+edge-node/build/
+edge-node/third_party/onnxruntime/**/lib/*.pdb
+edge-node/third_party/onnxruntime/**/lib/*.ilk
+onnxruntime-win-x64-*.zip
 
 # Temporary files
 index-*.html
