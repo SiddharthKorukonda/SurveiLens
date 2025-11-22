@@ -1,0 +1,4 @@
+/Users/ramko/Downloads/surveilens_revamp/backend/video-core/build/CMakeFiles/pipeline_proto.dir
+/Users/ramko/Downloads/surveilens_revamp/backend/video-core/build/CMakeFiles/surveilens_video_core.dir
+/Users/ramko/Downloads/surveilens_revamp/backend/video-core/build/CMakeFiles/edit_cache.dir
+/Users/ramko/Downloads/surveilens_revamp/backend/video-core/build/CMakeFiles/rebuild_cache.dir

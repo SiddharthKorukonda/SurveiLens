@@ -1,0 +1,44 @@
+use anyhow::Result;
+use tonic::transport::Channel;
+use tonic::Request;
+
+use crate::proto::pipeline::{
+    pipeline_client::PipelineClient,
+    StartReq, StopReq, SetReq, Ack,
+};
+
+async fn client() -> Result<PipelineClient<Channel>> {
+    let addr = std::env::var("CXX_WORKER_ADDR")
+        .unwrap_or_else(|_| "http://127.0.0.1:50051".to_string());
+    let ch = PipelineClient::connect(addr).await?;
+    Ok(ch)
+}
+
+pub async fn send_start(site: &str, cam: &str, rtsp: &str) -> Result<Ack> {
+    let mut c = client().await?;
+    let req = Request::new(StartReq {
+        site_id: site.to_string(),
+        camera_id: cam.to_string(),
+        rtsp: rtsp.to_string(),
+    });
+    Ok(c.start_camera(req).await?.into_inner())
+}
+
+pub async fn send_stop(site: &str, cam: &str) -> Result<Ack> {
+    let mut c = client().await?;
+    let req = Request::new(StopReq {
+        site_id: site.to_string(),
+        camera_id: cam.to_string(),
+    });
+    Ok(c.stop_camera(req).await?.into_inner())
+}
+
+pub async fn send_setparams(site: &str, cam: &str, json_params: String) -> Result<Ack> {
+    let mut c = client().await?;
+    let req = Request::new(SetReq {
+        site_id: site.to_string(),
+        camera_id: cam.to_string(),
+        json_params,
+    });
+    Ok(c.set_params(req).await?.into_inner())
+}

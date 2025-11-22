@@ -1,0 +1,86 @@
+pub mod pb { tonic::include_proto!("surveilens"); }
+
+use crate::{api::AppState, jsonlog, alerts, cns};
+use pb::{pipeline_client::PipelineClient, pipeline_server::{Pipeline, PipelineServer}, Event, AudioFrame, Ack, StartReq, StopReq, SetReq};
+use tonic::{Request, Response, Status};
+use futures::StreamExt;
+use serde_json::json;
+use uuid::Uuid;
+
+pub async fn send_start(site: &str, cam: &str, rtsp: &str) -> anyhow::Result<()> {
+    let mut cli = PipelineClient::connect(worker_addr()).await?;
+    cli.start_camera(Request::new(StartReq{
+        site_id: site.into(), camera_id: cam.into(), rtsp_url: rtsp.into()
+    })).await?;
+    Ok(())
+}
+pub async fn send_stop(site: &str, cam: &str) -> anyhow::Result<()> {
+    let mut cli = PipelineClient::connect(worker_addr()).await?;
+    cli.stop_camera(Request::new(StopReq{
+        site_id: site.into(), camera_id: cam.into()
+    })).await?;
+    Ok(())
+}
+
+fn worker_addr() -> String { std::env::var("CXX_WORKER_ADDR").unwrap_or("http://127.0.0.1:50051".into()) }
+
+#[derive(Clone)]
+pub struct IngestSvc { state: AppState }
+#[tonic::async_trait]
+impl Pipeline for IngestSvc {
+    async fn start_camera(&self, _r: Request<StartReq>) -> Result<Response<Ack>, Status> {
+        Err(Status::unimplemented("control-plane does not host StartCamera"))
+    }
+    async fn stop_camera(&self, _r: Request<StopReq>) -> Result<Response<Ack>, Status> {
+        Err(Status::unimplemented("control-plane does not host StopCamera"))
+    }
+    async fn set_params(&self, _r: Request<SetReq>) -> Result<Response<Ack>, Status> {
+        Err(Status::unimplemented("control-plane does not host SetParams"))
+    }
+
+    type StreamEventsStream = tokio_stream::wrappers::ReceiverStream<Result<Ack, Status>>;
+    async fn stream_events(&self, req: Request<tonic::Streaming<Event>>) -> Result<Response<Ack>, Status> {
+        let mut stream = req.into_inner();
+        let st = self.state.clone();
+
+        while let Some(Ok(ev)) = stream.next().await {
+            let key = format!("{}|{}", ev.site_id, ev.camera_id);
+            let rec = json!({
+              "ts": ev.ts_iso, "site_id": ev.site_id, "camera_id": ev.camera_id,
+              "frame_id": ev.frame_id, "level_local": ev.level_local,
+              "risk_local": ev.risk_local,
+              "objects": ev.objects.iter().map(|o| json!({"name":o.name,"conf":o.conf})).collect::<Vec<_>>(),
+              "actions": ev.actions.iter().map(|a| json!({"name":a.name,"conf":a.conf})).collect::<Vec<_>>(),
+              "zones": ev.zones,
+              "audio_flags": ev.audio_flags.iter().map(|f| json!({"name":f.name,"conf":f.conf})).collect::<Vec<_>>()
+            });
+            st.cache.insert(key.clone(), rec.clone());
+
+            jsonlog::maybe_emit(&key, &rec, &st).await.ok();
+
+            if ev.level_local=="medium" || ev.level_local=="high" {
+              let id = Uuid::new_v4().to_string();
+              let mut alert = rec.clone();
+              alert["id"] = json!(id);
+              st.alerts.insert(id.clone(), alert.clone());
+              alerts::notify_owner(&id, &st).await.ok();
+              cns::enrich_async(alert, st.clone());
+            }
+        }
+        Ok(Response::new(Ack{ ok: true, msg: "ingested".into() }))
+    }
+
+    type StreamAudioStream = tokio_stream::wrappers::ReceiverStream<Result<Ack, Status>>;
+    async fn stream_audio(&self, _req: Request<tonic::Streaming<AudioFrame>>) -> Result<Response<Ack>, Status> {
+        Ok(Response::new(Ack{ ok: true, msg: "audio-ok".into() }))
+    }
+}
+
+pub async fn run_grpc_ingest_server(state: AppState) -> anyhow::Result<()> {
+    let addr = std::env::var("RUST_GRPC_BIND").unwrap_or("0.0.0.0:50052".into()).parse()?;
+    let svc = IngestSvc{ state };
+    tonic::transport::Server::builder()
+        .add_service(PipelineServer::new(svc))
+        .serve(addr).await?;
+    Ok(())
+}

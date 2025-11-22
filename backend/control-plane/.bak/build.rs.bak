@@ -1,0 +1,8 @@
+fn main() {
+    tonic_build::configure()
+        .build_server(false) // control-plane is a client to the C++ worker
+        .compile_protos(&["proto/pipeline.proto"], &["proto"])
+        .unwrap();
+
+    println!("cargo:rerun-if-changed=proto/pipeline.proto");
+}

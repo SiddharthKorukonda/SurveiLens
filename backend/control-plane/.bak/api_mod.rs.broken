@@ -1,0 +1,65 @@
+use axum::{Json, extract::{Path, Query, State}};
+use serde::{Serialize, Deserialize};
+use std::{sync::Arc, time::{SystemTime}};
+use dashmap::DashMap;
+use crate::{jsonlog, alerts, grpc_client, policy};
+use serde_json::json;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub cache: Arc<DashMap<String, serde_json::Value>>,
+    pub alerts: Arc<DashMap<String, serde_json::Value>>,
+    pub last_quiet: Arc<DashMap<String, u64>>,
+}
+impl AppState {
+    pub async fn new() -> anyhow::Result<Self> {
+        Ok(Self{
+            cache: Arc::new(DashMap::new()),
+            alerts: Arc::new(DashMap::new()),
+            last_quiet: Arc::new(DashMap::new()),
+        })
+    }
+}
+
+#[derive(Deserialize)] pub struct EventsQuery { camera_id: Option<String>, since: Option<String> }
+
+pub async fn start_cam(State(_st): State<AppState>, Path((site, cam)): Path<(String,String)>) -> Json<serde_json::Value> {
+    let rtsp = std::env::var("DEFAULT_RTSP").unwrap_or_default();
+    let ok = grpc_client::send_start(&site, &cam, &rtsp).await.is_ok();
+    Json(json!({ "ok": ok }))
+}
+pub async fn stop_cam(State(_st): State<AppState>, Path((site, cam)): Path<(String,String)>) -> Json<serde_json::Value> {
+    let ok = grpc_client::send_stop(&site, &cam).await.is_ok();
+    Json(json!({ "ok": ok }))
+}
+pub async fn compile_policy(State(_): State<AppState>, Json(body): Json<serde_json::Value>) -> Json<serde_json::Value> {
+    let ok = policy::compile_and_push(body).await.is_ok();
+    Json(json!({ "ok": ok }))
+}
+pub async fn get_events(State(st): State<AppState>, Query(q): Query<EventsQuery>) -> Json<serde_json::Value> {
+    let mut out = vec![];
+    for v in st.cache.iter() {
+        if let Some(cid) = &q.camera_id {
+            if !v.key().contains(cid) { continue; }
+        }
+        out.push(v.value().clone());
+    }
+    Json(json!({ "events": out }))
+}
+pub async fn list_alerts(State(st): State<AppState>) -> Json<serde_json::Value> {
+    let mut out = vec![];
+    for v in st.alerts.iter() { out.push(v.value().clone()); }
+    Json(json!({ "alerts": out }))
+}
+pub async fn get_alert(State(st): State<AppState>, Path(id): Path<String>) -> Json<serde_json::Value> {
+    let v = st.alerts.get(&id).map(|v| v.value().clone()).unwrap_or(json!({}));
+    Json(v)
+}
+pub async fn escalate(State(st): State<AppState>, Path(id): Path<String>) -> Json<serde_json::Value> {
+    alerts::notify_responder(&id, &st).await.ok();
+    Json(json!({ "ok": true }))
+}
+pub async fn latest_json(Path((site, cam)): Path<(String,String)>) -> Json<serde_json::Value> {
+    Json(jsonlog::latest_for(&site, &cam).await.unwrap_or(json!({})))
+}
+pub async fn health() -> Json<serde_json::Value> { Json(json!({"ok": true})) }

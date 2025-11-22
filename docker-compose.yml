@@ -1,0 +1,49 @@
+version: "3.8"
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: mediamtx
+    ports: ["8554:8554","8889:8889","8890:8890"]
+    environment:
+      MTX_PROTOCOLS: "tcp"
+    restart: unless-stopped
+
+  cam1:
+    image: jrottenberg/ffmpeg:6.0-ubuntu
+    depends_on: [mediamtx]
+    command: >
+      -re -stream_loop -1 -i /samples/sample1.mp4
+      -c:v libx264 -f rtsp rtsp://mediamtx:8554/cam1
+    volumes:
+      - ./samples:/samples:ro
+
+  cam2:
+    image: jrottenberg/ffmpeg:6.0-ubuntu
+    depends_on: [mediamtx]
+    command: >
+      -re -stream_loop -1 -i /samples/sample2.mp4
+      -c:v libx264 -f rtsp rtsp://mediamtx:8554/cam2
+    volumes:
+      - ./samples:/samples:ro
+
+  control-plane:
+    build:
+      context: ./backend/control-plane
+      dockerfile: Dockerfile
+    environment:
+      RUST_HTTP_BIND: "0.0.0.0:8080"
+      RUST_GRPC_BIND: "0.0.0.0:50052"
+      CXX_WORKER_ADDR: "http://video-core:50051"
+      DEFAULT_RTSP: "rtsp://mediamtx:8554/cam1"
+    ports: ["8080:8080","50052:50052"]
+    depends_on: [video-core]
+
+  video-core:
+    build:
+      context: ./backend/video-core
+      dockerfile: Dockerfile
+    environment:
+      RUST_CONTROL_PLANE: "control-plane:50052"
+      CXX_WORKER_BIND: "0.0.0.0:50051"
+    ports: ["50051:50051"]
+    depends_on: [mediamtx]

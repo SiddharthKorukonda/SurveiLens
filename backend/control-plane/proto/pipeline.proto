@@ -1,0 +1,36 @@
+syntax = "proto3";
+package pipeline;
+
+// ---- Messages ----
+message Obj { string name = 1; float conf = 2; }
+message Act { string name = 1; float conf = 2; }
+message Aud { string name = 1; float conf = 2; }   // e.g., "raised_voice"
+message Phrase { string text = 1; float conf = 2; } // STT phrases (Rust sidecar)
+
+// C++ -> Rust event
+message Event {
+  string ts_iso     = 1;  // UTC ISO8601
+  string site_id    = 2;
+  string camera_id  = 3;
+  repeated Obj objects       = 4;
+  repeated Act actions       = 5;
+  repeated string zones      = 6;
+  repeated Aud audio_flags   = 7;
+  float risk_local           = 8;
+  string level_local         = 9;  // "none"|"low"|"medium"|"high"
+  uint64 frame_id            = 10;
+}
+
+// Control messages
+message StartReq { string site_id = 1; string camera_id = 2; string rtsp = 3; }
+message StopReq  { string site_id = 1; string camera_id = 2; }
+message SetReq   { string site_id = 1; string camera_id = 2; string json_params = 3; }
+message Ack      { bool ok = 1; string msg = 2; }
+
+// ---- Service (C++ worker is the server) ----
+service Pipeline {
+  rpc StartCamera (StartReq) returns (Ack);
+  rpc StopCamera  (StopReq)  returns (Ack);
+  rpc SetParams   (SetReq)   returns (Ack);
+  rpc StreamEvents (stream Event) returns (Ack);
+}

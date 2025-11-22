@@ -1,0 +1,10 @@
+logLevel: debug
+rtsp: yes
+rtmp: yes
+hls:  yes
+webrtc: yes
+srt:  yes
+
+paths:
+  cam1: {}
+  cam1_overlay: {}

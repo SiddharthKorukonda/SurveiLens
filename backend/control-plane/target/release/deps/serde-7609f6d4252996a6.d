@@ -1,0 +1,14 @@
+/Users/ramko/Downloads/surveilens_revamp/backend/control-plane/target/release/deps/serde-7609f6d4252996a6.d: /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/ramko/Downloads/surveilens_revamp/backend/control-plane/target/release/build/serde-5aa1dff86b852ca8/out/private.rs
+
+/Users/ramko/Downloads/surveilens_revamp/backend/control-plane/target/release/deps/libserde-7609f6d4252996a6.rlib: /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/ramko/Downloads/surveilens_revamp/backend/control-plane/target/release/build/serde-5aa1dff86b852ca8/out/private.rs
+
+/Users/ramko/Downloads/surveilens_revamp/backend/control-plane/target/release/deps/libserde-7609f6d4252996a6.rmeta: /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/ramko/Downloads/surveilens_revamp/backend/control-plane/target/release/build/serde-5aa1dff86b852ca8/out/private.rs
+
+/Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/Users/ramko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/Users/ramko/Downloads/surveilens_revamp/backend/control-plane/target/release/build/serde-5aa1dff86b852ca8/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/ramko/Downloads/surveilens_revamp/backend/control-plane/target/release/build/serde-5aa1dff86b852ca8/out

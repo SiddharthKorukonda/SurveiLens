@@ -1,0 +1,42 @@
+pub mod proto;
+mod api; mod cns; mod jsonlog; mod alerts; mod policy; mod stt; mod grpc_client;
+
+use axum::{routing::{get, post}, Router};
+use std::net::SocketAddr;
+use tower_http::cors::{CorsLayer, Any};
+use tracing_subscriber::{EnvFilter, fmt::Subscriber};
+use tokio::task;
+
+use crate::api::{health, start_cam, stop_cam, compile_policy, list_alerts, get_alert, escalate, get_events, latest_json};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    Subscriber::builder().with_env_filter(EnvFilter::from_default_env()).init();
+
+    let state = api::AppState::new().await?;
+
+    let grpc_state = state.clone();
+
+    if std::env::var("ELEVENLABS_API_KEY").is_ok() {
+        let stt_state = state.clone();
+        task::spawn(async move { stt::run(stt_state).await; });
+    }
+
+    let app = Router::new()
+        .route("/api/cameras/:site/:cam/start", post(start_cam))
+        .route("/api/cameras/:site/:cam/stop",  post(stop_cam))
+        .route("/api/policy/compile",           post(compile_policy))
+        .route("/api/events",                   get(get_events))
+        .route("/api/alerts",                   get(list_alerts))
+        .route("/api/alerts/:id",               get(get_alert))
+        .route("/api/alerts/:id/escalate",      post(escalate))
+        .route("/api/jsonlogs/:site/:cam/latest", get(latest_json))
+        .route("/health", get(health))
+        .layer(CorsLayer::new().allow_origin(Any).allow_headers(Any).allow_methods(Any))
+        .with_state(state.clone());
+
+    let bind = std::env::var("RUST_HTTP_BIND").unwrap_or_else(|_| "0.0.0.0:8080".into());
+    let addr: SocketAddr = bind.parse()?;
+    axum::serve(tokio::net::TcpListener::bind(addr).await?, app).await?;
+    Ok(())
+}

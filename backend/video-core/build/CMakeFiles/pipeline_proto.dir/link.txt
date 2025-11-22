@@ -1,0 +1,2 @@
+/usr/bin/ar qc libpipeline_proto.a CMakeFiles/pipeline_proto.dir/generated/pipeline.pb.cc.o CMakeFiles/pipeline_proto.dir/generated/pipeline.grpc.pb.cc.o
+/usr/bin/ranlib libpipeline_proto.a

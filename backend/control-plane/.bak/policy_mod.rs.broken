@@ -1,0 +1,24 @@
+use crate::grpc_client::{self, pb::SetReq};
+use serde_json::Value;
+
+pub async fn compile_and_push(body: Value) -> anyhow::Result<()> {
+    let site = body["site_id"].as_str().unwrap_or("site");
+    let cam  = body["camera_id"].as_str().unwrap_or("cam");
+    let th_med = body["risk_medium"].as_f64().unwrap_or(0.60) as f32;
+    let th_high= body["risk_high"].as_f64().unwrap_or(0.80) as f32;
+
+    let mut cli = grpc_client::pb::pipeline_client::PipelineClient::connect(
+        std::env::var("CXX_WORKER_ADDR").unwrap_or("http://127.0.0.1:50051".into())
+    ).await?;
+
+    let req = SetReq {
+        site_id: site.into(), camera_id: cam.into(),
+        obj_conf_thresh: body["obj_conf"].as_f64().unwrap_or(0.25) as f32,
+        act_conf_thresh: body["act_conf"].as_f64().unwrap_or(0.25) as f32,
+        risk_medium: th_med, risk_high: th_high,
+        zones: body["zones"].as_array().unwrap_or(&vec![]).iter().map(|v| v.as_str().unwrap_or("").to_string()).collect(),
+        keywords: body["keywords"].as_array().unwrap_or(&vec![]).iter().map(|v| v.as_str().unwrap_or("").to_string()).collect(),
+    };
+    let _ = cli.set_params(tonic::Request::new(req)).await?;
+    Ok(())
+}
