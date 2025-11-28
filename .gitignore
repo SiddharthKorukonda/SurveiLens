@@ -20,6 +20,19 @@ env/
 .DS_Store
 Thumbs.db
 
+# Environment / secrets
+.env
+.env.*
+*.env
+*.env.*
+.envrc
+
+# Common secret key formats
+*.pem
+*.key
+*.p12
+*.pfx
+
 # Project specific
 *.jsonl
 *.log
@@ -28,4 +41,5 @@ Thumbs.db
 
 # Temporary files
 index-*.html
+
 

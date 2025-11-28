@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import time
+from pathlib import Path
 from typing import Dict, Optional
 
 import cv2
@@ -17,6 +18,9 @@ from aiortc import RTCPeerConnection, RTCSessionDescription, MediaStreamTrack
 from aiortc.contrib.media import MediaRelay
 from av import VideoFrame
 
+# ---------- paths / constants ----------
+BASE_DIR = Path(__file__).resolve().parent
+
 # ---------- YOLO ----------
 try:
     from ultralytics import YOLO
@@ -29,9 +33,17 @@ WEBRTC_SHARED_SECRET = os.getenv("WEBRTC_SHARED_SECRET", "CHANGE_ME_SHARED_SECRE
 DEFAULT_SOURCE = int(os.getenv("VIDEO_SOURCE", "0"))     # camera index or RTSP/URL
 IMG_SIZE = int(os.getenv("IMG_SIZE", "640"))
 FPS = int(os.getenv("FPS", "30"))
-DEFAULT_WEIGHTS = os.getenv("YOLO_WEIGHTS", "yolo11n.pt")
+
+# resolve defaults relative to this backend module so they still work after repo restructuring
+DEFAULT_WEIGHTS = os.getenv(
+    "YOLO_WEIGHTS",
+    str((BASE_DIR / "yolo11n.pt").resolve())
+)
 DEFAULT_CONF = float(os.getenv("YOLO_CONF", "0.25"))
-ALERTS_JSONL_PATH = os.getenv("ALERTS_JSONL", "alerts.jsonl")
+ALERTS_JSONL_PATH = os.getenv(
+    "ALERTS_JSONL",
+    str((BASE_DIR / "alerts.jsonl").resolve())
+)
 MAX_ALERTS_RETURNED = int(os.getenv("MAX_ALERTS_RETURNED", "250"))
 YOLO_DEVICE = os.getenv("YOLO_DEVICE", None)  # "cpu", "mps", "cuda", or index
 

@@ -14,6 +14,7 @@ import traceback
 import platform
 import subprocess
 import tempfile
+from pathlib import Path
 from collections import deque
 
 # --- optional .env autoload ---
@@ -34,6 +35,7 @@ import requests
 # -------------------------
 # Configuration
 # -------------------------
+BACKEND_DIR = Path(__file__).resolve().parent
 DANGER_CONFIG = {
     "HIGH": {"knife", "gun", "pistol", "rifle", "revolver", "firearm"},
     "MEDIUM": {"scissors"},
@@ -606,8 +608,8 @@ def _safe_append_jsonl(path: str, obj: dict):
 # YOLO Live App
 # -------------------------
 class DangerYOLOApp:
-    def __init__(self, model_path="yolo11n.pt", source=0, imgsz=640, conf_thres=0.25, device=None,
-                 write_alerts_jsonl="alerts.jsonl", alarm_enabled=True, overlay_enabled=True,
+    def __init__(self, model_path=None, source=0, imgsz=640, conf_thres=0.25, device=None,
+                 write_alerts_jsonl=None, alarm_enabled=True, overlay_enabled=True,
                  alarm_backend=DEFAULT_ALARM_BACKEND, alarm_sound_file=None,
                  alarm_duration=4.0, alarm_volume=1.0,
                  # NeuralSeek
@@ -620,6 +622,12 @@ class DangerYOLOApp:
                  ns_high_threshold: float = 0.7,
                  transcript_buffer: TranscriptBuffer | None = None,
                  debug=False):
+        # allow callers to override, but default to files living next to this script
+        if model_path is None:
+            model_path = str((BACKEND_DIR / "yolo11n.pt").resolve())
+        if write_alerts_jsonl is None:
+            write_alerts_jsonl = str((BACKEND_DIR / "alerts.jsonl").resolve())
+
         self.model = YOLO(model_path)
         self.source = source
         self.imgsz = imgsz
@@ -870,7 +878,8 @@ class DangerYOLOApp:
 # -------------------------
 def main():
     parser = argparse.ArgumentParser(description="YOLO live danger detector + 10s audio STT (ElevenLabs REST) → JSON")
-    parser.add_argument("--yolo-weights", default="yolo11n.pt", help="YOLO weights (e.g., yolo11n.pt / yolov8n.pt / custom.pt)")
+    parser.add_argument("--yolo-weights", default=str((BACKEND_DIR / "yolo11n.pt").resolve()),
+                        help="YOLO weights (e.g., yolo11n.pt / yolov8n.pt / custom.pt)")
     parser.add_argument("--source", default=0, help="Video source (int index, path, or URL)")
     parser.add_argument("--imgsz", type=int, default=640, help="Inference size")
     parser.add_argument("--conf", type=float, default=0.25, help="Confidence threshold")
@@ -886,12 +895,14 @@ def main():
     parser.add_argument("--timestamps-granularity", default="word", help="word|sentence|none")
 
     # Audio capture
-    parser.add_argument("--audio-json", default="audio_segments.jsonl", help="Output JSONL for 10s transcripts")
+    parser.add_argument("--audio-json", default=str((BACKEND_DIR / "audio_segments.jsonl").resolve()),
+                        help="Output JSONL for 10s transcripts")
     parser.add_argument("--audio-chunk-sec", type=int, default=10, help="Seconds per audio chunk")
     parser.add_argument("--audio-samplerate", type=int, default=16000, help="Sample rate (try 44100 if needed)")
     parser.add_argument("--audio-device", default=None, help="sounddevice input device id/name (optional)")
 
-    parser.add_argument("--alerts-json", default="alerts.jsonl", help="Output JSONL for HIGH danger alerts")
+    parser.add_argument("--alerts-json", default=str((BACKEND_DIR / "alerts.jsonl").resolve()),
+                        help="Output JSONL for HIGH danger alerts")
 
     # Alarm / isolation / debug
     parser.add_argument("--no-alarm", action="store_true", help="Disable alarm sound on HIGH danger")
