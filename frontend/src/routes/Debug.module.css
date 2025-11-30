@@ -1,0 +1,243 @@
+.container {
+  padding: var(--space-lg) 0;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--space-xl);
+  gap: var(--space-lg);
+}
+
+.title {
+  font-size: 1.75rem;
+  margin-bottom: var(--space-xs);
+}
+
+.subtitle {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+}
+
+.select {
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  background: var(--color-glass);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.select:focus {
+  border-color: var(--color-accent);
+}
+
+/* Console */
+.console {
+  padding: 0;
+  overflow: hidden;
+  margin-bottom: var(--space-xl);
+}
+
+.consoleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-glass-strong);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.consoleTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.consoleDot {
+  width: 8px;
+  height: 8px;
+  background: var(--color-success);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.logCount {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.pausedBadge {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.625rem;
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.consoleBody {
+  height: 400px;
+  overflow-y: auto;
+  padding: var(--space-md);
+  background: var(--color-bg-primary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+.emptyConsole {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-muted);
+}
+
+.logEntry {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  border-left: 2px solid transparent;
+  padding-left: var(--space-sm);
+}
+
+.logTime {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.logLevel {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.logMessage {
+  color: var(--color-text-secondary);
+  word-break: break-word;
+}
+
+/* Log levels */
+.levelInfo .logLevel {
+  color: var(--color-accent);
+}
+
+.levelError {
+  border-left-color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.levelError .logLevel {
+  color: var(--color-danger);
+}
+
+.levelError .logMessage {
+  color: var(--color-danger);
+}
+
+.levelAlert {
+  border-left-color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.levelAlert .logLevel {
+  color: var(--color-warning);
+}
+
+.levelSuccess .logLevel {
+  color: var(--color-success);
+}
+
+/* Stats */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+}
+
+.statCard {
+  text-align: center;
+  padding: var(--space-lg);
+}
+
+.statValue {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  line-height: 1;
+  margin-bottom: var(--space-xs);
+}
+
+.statError {
+  color: var(--color-danger);
+}
+
+.statAlert {
+  color: var(--color-warning);
+}
+
+.statLabel {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Error panel */
+.errorPanel {
+  text-align: center;
+  padding: var(--space-3xl);
+  max-width: 400px;
+  margin: var(--space-xl) auto;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+  }
+
+  .controls {
+    flex-wrap: wrap;
+  }
+
+  .stats {
+    grid-template-columns: 1fr;
+  }
+}
+

@@ -1,0 +1,321 @@
+.container {
+  padding: var(--space-lg) 0;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--space-xl);
+  gap: var(--space-lg);
+}
+
+.title {
+  font-size: 1.75rem;
+  margin-bottom: var(--space-xs);
+}
+
+.subtitle {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.updated {
+  color: var(--color-text-muted);
+}
+
+.severityCounts {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.countBadge {
+  padding: var(--space-xs) var(--space-md);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.countHigh {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
+
+.countMedium {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
+}
+
+.countLow {
+  background: rgba(100, 116, 139, 0.15);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+/* Filters */
+.filters {
+  display: flex;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-xl);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.filterSearch {
+  flex: 1;
+}
+
+.filterLabel {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+}
+
+.select {
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  background: var(--color-glass);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.select:focus {
+  border-color: var(--color-accent);
+}
+
+.searchInput {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  background: var(--color-glass);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.searchInput:focus {
+  border-color: var(--color-accent);
+}
+
+.searchInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-3xl);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Empty state */
+.emptyState {
+  text-align: center;
+  padding: var(--space-3xl);
+}
+
+.emptyIcon {
+  font-size: 3rem;
+  color: var(--color-success);
+  margin-bottom: var(--space-md);
+}
+
+.emptyState h3 {
+  margin-bottom: var(--space-sm);
+}
+
+.emptyState p {
+  color: var(--color-text-secondary);
+}
+
+/* Alerts list */
+.alertsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.alertRow {
+  transition: opacity var(--transition-fast);
+}
+
+.alertDenied {
+  opacity: 0.5;
+}
+
+.alertFlash {
+  animation: flashRed 0.5s ease-out;
+}
+
+@keyframes flashRed {
+  0% {
+    box-shadow: inset 4px 0 0 var(--color-danger);
+  }
+  100% {
+    box-shadow: inset 4px 0 0 transparent;
+  }
+}
+
+.alertCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.alertMain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  flex: 1;
+  min-width: 0;
+}
+
+.alertTime {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.alertCamera {
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+.alertLabels {
+  flex: 1;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Triage buttons */
+.triageButtons {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.triageBtn {
+  padding: var(--space-xs) var(--space-sm);
+  font-family: var(--font-display);
+  font-size: 0.625rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.triageAccept {
+  color: var(--color-text-muted);
+}
+
+.triageAccept:hover,
+.triageAccept.triageActive {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.triageReview {
+  color: var(--color-text-muted);
+}
+
+.triageReview:hover,
+.triageReview.triageActive {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.triageDeny {
+  color: var(--color-text-muted);
+}
+
+.triageDeny:hover,
+.triageDeny.triageActive {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+/* Error panel */
+.errorPanel {
+  text-align: center;
+  padding: var(--space-3xl);
+  max-width: 400px;
+  margin: var(--space-xl) auto;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+
+  .alertCard {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .alertMain {
+    flex-wrap: wrap;
+  }
+
+  .triageButtons {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+

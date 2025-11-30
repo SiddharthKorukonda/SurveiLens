@@ -1,0 +1,32 @@
+.panel {
+  background: var(--color-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-glass);
+  transition: all var(--transition-normal);
+}
+
+.panel:hover {
+  border-color: var(--color-border-strong);
+}
+
+.strong {
+  background: var(--color-glass-strong);
+}
+
+.light {
+  background: var(--color-glass-light);
+}
+
+.glow {
+  box-shadow: var(--shadow-glass), 0 0 0 1px var(--color-border);
+}
+
+.glow:hover {
+  box-shadow: var(--shadow-glass), var(--shadow-glow);
+  border-color: var(--color-border-glow);
+}
+

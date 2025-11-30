@@ -1,0 +1,81 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 80px);
+}
+
+.subNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-lg);
+}
+
+.subNavLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.backBtn {
+  padding: var(--space-xs) var(--space-md) !important;
+}
+
+.serverName {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.tab:hover {
+  color: var(--color-text-primary);
+  background: var(--color-glass-light);
+}
+
+.tabActive {
+  color: var(--color-accent);
+  background: var(--color-glass);
+  border: 1px solid var(--color-border);
+}
+
+.tabIcon {
+  font-size: 0.875rem;
+}
+
+.tabLabel {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .tabLabel {
+    display: inline;
+  }
+}
+
+.content {
+  flex: 1;
+}
+
