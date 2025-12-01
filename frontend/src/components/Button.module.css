@@ -1,59 +1,227 @@
+/* ============================================
+   Button Component
+   Futuristic buttons with glow and animations
+   ============================================ */
+
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
   font-family: var(--font-display);
-  font-weight: 500;
-  letter-spacing: 0.05em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+  isolation: isolate;
 }
 
 .button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+  filter: grayscale(30%);
 }
 
-/* Variants */
+/* Content wrapper */
+.content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  position: relative;
+  z-index: 2;
+}
+
+.text {
+  white-space: nowrap;
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
+}
+
+/* ============================================
+   Shimmer Effect
+   ============================================ */
+
+.shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+  z-index: 1;
+}
+
+.button:hover:not(:disabled) .shimmer {
+  transform: translateX(100%);
+}
+
+/* ============================================
+   Border Glow Animation
+   ============================================ */
+
+.borderGlow {
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    var(--button-glow-color, var(--color-accent)),
+    transparent 30%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 0;
+  animation: borderRotate 3s linear infinite paused;
+}
+
+.button:hover:not(:disabled) .borderGlow {
+  opacity: 0.6;
+  animation-play-state: running;
+}
+
+@keyframes borderRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Mask to show only border */
+.borderGlow::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: inherit;
+  border-radius: inherit;
+  background: var(--button-bg, var(--color-bg-primary));
+}
+
+/* ============================================
+   Hover Glow Overlay
+   ============================================ */
+
+.hoverGlow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at center,
+    var(--button-glow-color, rgba(56, 189, 248, 0.2)) 0%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.button:hover:not(:disabled) .hoverGlow {
+  opacity: 1;
+}
+
+/* ============================================
+   Variants
+   ============================================ */
+
 .primary {
-  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-secondary));
+  --button-glow-color: var(--color-accent);
+  --button-bg: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-secondary) 100%);
+  background: var(--button-bg);
   color: var(--color-bg-primary);
   border-color: var(--color-accent);
+  box-shadow: 
+    0 4px 15px rgba(56, 189, 248, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .primary:hover:not(:disabled) {
-  box-shadow: 0 0 20px var(--color-accent-glow);
+  box-shadow: 
+    0 8px 30px rgba(56, 189, 248, 0.4),
+    0 0 20px rgba(56, 189, 248, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  border-color: var(--color-accent-bright);
 }
 
 .secondary {
-  background: var(--color-glass);
+  --button-glow-color: var(--color-accent);
+  --button-bg: var(--color-glass);
+  background: var(--button-bg);
   color: var(--color-text-primary);
-  border-color: var(--color-border);
-  backdrop-filter: blur(8px);
+  border-color: var(--color-border-strong);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 
+    0 4px 15px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .secondary:hover:not(:disabled) {
-  background: var(--color-glass-strong);
+  background: var(--color-glass-hover);
   border-color: var(--color-accent);
+  box-shadow: 
+    0 8px 30px rgba(0, 0, 0, 0.3),
+    0 0 15px rgba(56, 189, 248, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .danger {
-  background: linear-gradient(135deg, var(--color-danger), #dc2626);
+  --button-glow-color: var(--color-danger);
+  --button-bg: linear-gradient(135deg, var(--color-danger) 0%, #dc2626 100%);
+  background: var(--button-bg);
   color: var(--color-text-primary);
   border-color: var(--color-danger);
+  box-shadow: 
+    0 4px 15px rgba(239, 68, 68, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .danger:hover:not(:disabled) {
-  box-shadow: 0 0 20px var(--color-danger-glow);
+  box-shadow: 
+    0 8px 30px rgba(239, 68, 68, 0.4),
+    0 0 20px rgba(239, 68, 68, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  border-color: var(--color-danger-bright);
+}
+
+.success {
+  --button-glow-color: var(--color-success);
+  --button-bg: linear-gradient(135deg, var(--color-success) 0%, #16a34a 100%);
+  background: var(--button-bg);
+  color: var(--color-bg-primary);
+  border-color: var(--color-success);
+  box-shadow: 
+    0 4px 15px rgba(34, 197, 94, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.success:hover:not(:disabled) {
+  box-shadow: 
+    0 8px 30px rgba(34, 197, 94, 0.4),
+    0 0 20px rgba(34, 197, 94, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  border-color: var(--color-success-bright);
 }
 
 .ghost {
+  --button-glow-color: var(--color-accent);
+  --button-bg: transparent;
   background: transparent;
   color: var(--color-text-secondary);
   border-color: transparent;
@@ -61,65 +229,126 @@
 
 .ghost:hover:not(:disabled) {
   color: var(--color-text-primary);
-  background: var(--color-glass-light);
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.2);
+  text-shadow: 0 0 10px var(--color-accent-glow);
 }
 
-/* Sizes */
+/* ============================================
+   Sizes
+   ============================================ */
+
 .sm {
-  padding: var(--space-xs) var(--space-sm);
-  font-size: 0.75rem;
+  padding: var(--space-xs) var(--space-md);
+  font-size: 0.7rem;
+  min-height: 32px;
 }
 
 .md {
   padding: var(--space-sm) var(--space-lg);
-  font-size: 0.875rem;
+  font-size: 0.8rem;
+  min-height: 40px;
 }
 
 .lg {
   padding: var(--space-md) var(--space-xl);
-  font-size: 1rem;
+  font-size: 0.9rem;
+  min-height: 48px;
 }
 
-/* Glow effect */
+.xl {
+  padding: var(--space-lg) var(--space-2xl);
+  font-size: 1rem;
+  min-height: 56px;
+}
+
+/* ============================================
+   Glow Effect
+   ============================================ */
+
 .glow {
   animation: buttonGlow 2s ease-in-out infinite;
 }
 
 @keyframes buttonGlow {
   0%, 100% {
-    box-shadow: 0 0 5px var(--color-accent-glow);
+    box-shadow: 
+      0 4px 15px var(--button-glow-color, rgba(56, 189, 248, 0.2)),
+      0 0 5px var(--button-glow-color, rgba(56, 189, 248, 0.2));
   }
   50% {
-    box-shadow: 0 0 20px var(--color-accent-glow), 0 0 40px var(--color-accent-glow);
+    box-shadow: 
+      0 8px 30px var(--button-glow-color, rgba(56, 189, 248, 0.4)),
+      0 0 30px var(--button-glow-color, rgba(56, 189, 248, 0.3)),
+      0 0 60px var(--button-glow-color, rgba(56, 189, 248, 0.2));
   }
 }
 
-/* Full width */
+/* ============================================
+   Pulse Effect
+   ============================================ */
+
+.pulse {
+  animation: buttonPulse 2s ease-in-out infinite;
+}
+
+@keyframes buttonPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.pulse .borderGlow {
+  opacity: 0.4;
+  animation-play-state: running;
+}
+
+/* ============================================
+   Pressed State
+   ============================================ */
+
+.pressed {
+  transform: scale(0.97);
+}
+
+/* ============================================
+   Full Width
+   ============================================ */
+
 .fullWidth {
   width: 100%;
 }
 
-/* Loading state */
+/* ============================================
+   Loading State
+   ============================================ */
+
 .loading .content {
-  opacity: 0.7;
+  opacity: 0;
 }
 
 .spinner {
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
-  width: 1.25em;
-  height: 1.25em;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 1.5em;
+  height: 1.5em;
   animation: spin 1s linear infinite;
+  z-index: 3;
 }
 
 .spinner svg {
   width: 100%;
   height: 100%;
+  filter: drop-shadow(0 0 4px currentColor);
 }
 
 @keyframes spin {
-  from { transform: translateX(-50%) rotate(0deg); }
-  to { transform: translateX(-50%) rotate(360deg); }
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 

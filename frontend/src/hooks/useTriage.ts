@@ -25,6 +25,19 @@ function saveTriage(triage: TriageMap): void {
   }
 }
 
+// Clear all triage data for a specific server (standalone function)
+export function clearTriageForServer(serverId: string): void {
+  const triage = loadTriage();
+  const next: TriageMap = {};
+  for (const [key, value] of Object.entries(triage)) {
+    if (!key.startsWith(`${serverId}:`)) {
+      next[key] = value;
+    }
+  }
+  saveTriage(next);
+  console.log('[useTriage] Cleared triage data for server:', serverId);
+}
+
 export function useTriage(serverId: string) {
   const [triageMap, setTriageMap] = useState<TriageMap>(() => loadTriage());
 

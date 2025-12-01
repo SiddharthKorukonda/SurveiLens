@@ -1,3 +1,8 @@
+/* ============================================
+   Modal Component
+   Futuristic modal with blur/shrink animations
+   ============================================ */
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -5,35 +10,124 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-lg);
+  padding: var(--space-xl);
 }
 
+/* Backdrop with vignette */
 .backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
+.vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 40%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
+  pointer-events: none;
+}
+
+/* Modal container */
 .modal {
   position: relative;
   width: 100%;
-  max-height: calc(100vh - var(--space-xl) * 2);
-  overflow: auto;
+  max-height: calc(100vh - var(--space-2xl) * 2);
+  overflow: visible;
 }
 
+.panel {
+  position: relative;
+  overflow: visible;
+}
+
+/* Size variants */
 .sm {
   max-width: 400px;
 }
 
 .md {
-  max-width: 600px;
+  max-width: 550px;
 }
 
 .lg {
-  max-width: 900px;
+  max-width: 800px;
 }
 
+/* Corner accents */
+.cornerTL,
+.cornerTR,
+.cornerBL,
+.cornerBR {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.cornerTL {
+  top: -2px;
+  left: -2px;
+  border-top: 2px solid var(--color-accent);
+  border-left: 2px solid var(--color-accent);
+  border-radius: var(--radius-sm) 0 0 0;
+  box-shadow: 
+    -4px -4px 10px var(--color-accent-glow),
+    inset 2px 2px 4px var(--color-accent-glow);
+}
+
+.cornerTR {
+  top: -2px;
+  right: -2px;
+  border-top: 2px solid var(--color-accent);
+  border-right: 2px solid var(--color-accent);
+  border-radius: 0 var(--radius-sm) 0 0;
+  box-shadow: 
+    4px -4px 10px var(--color-accent-glow),
+    inset -2px 2px 4px var(--color-accent-glow);
+}
+
+.cornerBL {
+  bottom: -2px;
+  left: -2px;
+  border-bottom: 2px solid var(--color-accent);
+  border-left: 2px solid var(--color-accent);
+  border-radius: 0 0 0 var(--radius-sm);
+  box-shadow: 
+    -4px 4px 10px var(--color-accent-glow),
+    inset 2px -2px 4px var(--color-accent-glow);
+}
+
+.cornerBR {
+  bottom: -2px;
+  right: -2px;
+  border-bottom: 2px solid var(--color-accent);
+  border-right: 2px solid var(--color-accent);
+  border-radius: 0 0 var(--radius-sm) 0;
+  box-shadow: 
+    4px 4px 10px var(--color-accent-glow),
+    inset -2px -2px 4px var(--color-accent-glow);
+}
+
+/* Danger variant corners */
+.danger .cornerTL,
+.danger .cornerTR,
+.danger .cornerBL,
+.danger .cornerBR {
+  border-color: var(--color-danger);
+  box-shadow: 
+    0 0 10px var(--color-danger-glow),
+    inset 0 0 4px var(--color-danger-glow);
+}
+
+/* Header */
 .header {
   display: flex;
   align-items: center;
@@ -41,13 +135,52 @@
   margin-bottom: var(--space-lg);
   padding-bottom: var(--space-md);
   border-bottom: 1px solid var(--color-border);
+  position: relative;
+  gap: var(--space-md);
+}
+
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-accent),
+    transparent
+  );
+  opacity: 0.5;
+}
+
+.danger .header::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-danger),
+    transparent
+  );
 }
 
 .title {
+  font-family: var(--font-display);
   font-size: 1.25rem;
+  font-weight: 600;
   color: var(--color-text-primary);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding-left: var(--space-sm);
+  flex: 1;
 }
 
+.danger .title {
+  color: var(--color-danger);
+  text-shadow: 0 0 10px var(--color-danger-glow);
+}
+
+/* Close button */
 .closeButton {
   display: flex;
   align-items: center;
@@ -55,26 +188,39 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  background: transparent;
+  background: rgba(56, 189, 248, 0.1);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .closeButton:hover {
-  background: var(--color-glass);
+  background: rgba(56, 189, 248, 0.2);
   border-color: var(--color-accent);
-  color: var(--color-text-primary);
+  color: var(--color-accent);
+  box-shadow: 
+    0 0 15px var(--color-accent-glow),
+    inset 0 0 10px rgba(56, 189, 248, 0.1);
+}
+
+.danger .closeButton:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  box-shadow: 
+    0 0 15px var(--color-danger-glow),
+    inset 0 0 10px rgba(239, 68, 68, 0.1);
 }
 
 .closeButton svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
+/* Content */
 .content {
-  /* Content styling */
+  position: relative;
 }
-

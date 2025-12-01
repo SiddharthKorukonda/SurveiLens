@@ -9,6 +9,7 @@ interface ModalProps {
   title?: string;
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'danger';
 }
 
 export function Modal({
@@ -17,6 +18,7 @@ export function Modal({
   title,
   children,
   size = 'md',
+  variant = 'default',
 }: ModalProps) {
   // Close on escape key
   useEffect(() => {
@@ -37,33 +39,88 @@ export function Modal({
     };
   }, [isOpen, onClose]);
 
+  const backdropVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1 },
+  };
+
+  const modalVariants = {
+    hidden: { 
+      opacity: 0, 
+      scale: 0.8, 
+      y: 30,
+    },
+    visible: { 
+      opacity: 1, 
+      scale: 1, 
+      y: 0,
+      transition: {
+        type: 'spring',
+        stiffness: 400,
+        damping: 30,
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 0.9, 
+      y: -20,
+      transition: {
+        duration: 0.2,
+        ease: 'easeOut',
+      }
+    },
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
         <div className={styles.overlay}>
+          {/* Backdrop with blur and vignette */}
           <motion.div
             className={styles.backdrop}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            variants={backdropVariants}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
             onClick={onClose}
-          />
-          <motion.div
-            className={`${styles.modal} ${styles[size]}`}
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
           >
-            <GlassPanel variant="strong" glow>
+            <div className={styles.vignette} />
+          </motion.div>
+          
+          {/* Modal container */}
+          <motion.div
+            className={`${styles.modal} ${styles[size]} ${styles[variant]}`}
+            variants={modalVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            <GlassPanel 
+              variant="strong" 
+              glow 
+              neonColor={variant === 'danger' ? 'red' : 'cyan'}
+              className={styles.panel}
+            >
+              {/* Animated corner accents */}
+              <div className={styles.cornerTL} />
+              <div className={styles.cornerTR} />
+              <div className={styles.cornerBL} />
+              <div className={styles.cornerBR} />
+              
               {title && (
                 <div className={styles.header}>
                   <h3 className={styles.title}>{title}</h3>
-                  <button className={styles.closeButton} onClick={onClose}>
+                  <motion.button 
+                    className={styles.closeButton} 
+                    onClick={onClose}
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                  >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                  </button>
+                  </motion.button>
                 </div>
               )}
               <div className={styles.content}>{children}</div>
@@ -76,4 +133,3 @@ export function Modal({
 }
 
 export default Modal;
-

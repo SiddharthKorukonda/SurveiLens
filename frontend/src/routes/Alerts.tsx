@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -15,16 +15,58 @@ import ServerLayout from './ServerLayout';
 
 type TimeFilter = '5' | '60' | '1440' | '0';
 
+// Severity chip component with glow
+function SeverityChip({ 
+  severity, 
+  count, 
+  active,
+  onClick 
+}: { 
+  severity: Severity | 'all'; 
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const colors = {
+    all: { bg: 'rgba(56, 189, 248, 0.15)', border: 'rgba(56, 189, 248, 0.4)', text: 'var(--color-accent)' },
+    high: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.4)', text: 'var(--color-danger)' },
+    medium: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.4)', text: 'var(--color-warning)' },
+    low: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.4)', text: 'var(--color-success)' },
+  };
+
+  const c = colors[severity];
+
+  return (
+    <motion.button
+      className={`${styles.severityChip} ${active ? styles.severityChipActive : ''}`}
+      style={{
+        background: c.bg,
+        borderColor: active ? c.text : c.border,
+        color: c.text,
+        boxShadow: active ? `0 0 15px ${c.border}` : 'none',
+      }}
+      onClick={onClick}
+      whileHover={{ scale: 1.05, y: -2 }}
+      whileTap={{ scale: 0.95 }}
+    >
+      <span className={styles.chipLabel}>{severity === 'all' ? 'All' : severity}</span>
+      <span className={styles.chipCount}>{count}</span>
+    </motion.button>
+  );
+}
+
 export function Alerts() {
   const { serverId } = useParams<{ serverId: string }>();
   const navigate = useNavigate();
   const { getServer } = useServers();
   const server = getServer(serverId || '');
   const { getTriage, setTriage } = useTriage(serverId || '');
+  const listRef = useRef<HTMLDivElement>(null);
 
   const [alerts, setAlerts] = useState<AlertRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [newAlertIds, setNewAlertIds] = useState<Set<string>>(new Set());
 
   // Filters
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('1440');
@@ -38,6 +80,28 @@ export function Alerts() {
     const fetchAlerts = async () => {
       try {
         const data = await getAlerts(server.baseUrl);
+        
+        // Track new alerts
+        const currentIds = new Set(alerts.map(a => a.id));
+        const newIds = new Set<string>();
+        data.forEach(alert => {
+          if (!currentIds.has(alert.id)) {
+            newIds.add(alert.id);
+          }
+        });
+        
+        if (newIds.size > 0) {
+          setNewAlertIds(prev => new Set([...prev, ...newIds]));
+          // Clear new status after animation
+          setTimeout(() => {
+            setNewAlertIds(prev => {
+              const next = new Set(prev);
+              newIds.forEach(id => next.delete(id));
+              return next;
+            });
+          }, 3000);
+        }
+        
         setAlerts(data);
         setLastUpdated(new Date());
       } catch (err) {
@@ -50,26 +114,32 @@ export function Alerts() {
     fetchAlerts();
     const interval = setInterval(fetchAlerts, 5000);
     return () => clearInterval(interval);
-  }, [server]);
+  }, [server, alerts]);
 
-  // Filter alerts
+  // Filter alerts - only show alerts from after the server was created
   const filteredAlerts = useMemo(() => {
     const now = Date.now();
     const timeWindow = parseInt(timeFilter) * 60 * 1000;
+    
+    // Get server creation time - only show alerts after this time
+    const serverCreatedAt = server?.createdAt ? new Date(server.createdAt).getTime() : 0;
 
     return alerts.filter((alert) => {
-      // Time filter
+      const alertTime = new Date(alert.timestamp).getTime();
+      
+      // Filter out alerts from before server was created
+      if (alertTime < serverCreatedAt) {
+        return false;
+      }
+      
       if (timeWindow > 0) {
-        const alertTime = new Date(alert.timestamp).getTime();
         if (now - alertTime > timeWindow) return false;
       }
 
-      // Severity filter
       if (severityFilter !== 'all' && alert.severity !== severityFilter) {
         return false;
       }
 
-      // Search filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const labels = (alert.labels || []).join(' ').toLowerCase();
@@ -81,13 +151,14 @@ export function Alerts() {
 
       return true;
     });
-  }, [alerts, timeFilter, severityFilter, searchQuery]);
+  }, [alerts, timeFilter, severityFilter, searchQuery, server?.createdAt]);
 
   // Count by severity
   const counts = useMemo(() => {
-    const c = { high: 0, medium: 0, low: 0 };
+    const c = { all: 0, high: 0, medium: 0, low: 0 };
     filteredAlerts.forEach((a) => {
       c[a.severity]++;
+      c.all++;
     });
     return c;
   }, [filteredAlerts]);
@@ -95,7 +166,7 @@ export function Alerts() {
   if (!server) {
     return (
       <ServerLayout>
-        <GlassPanel className={styles.errorPanel}>
+        <GlassPanel className={styles.errorPanel} glow>
           <h2>Server not found</h2>
           <PrimaryButton onClick={() => navigate('/servers')}>
             Back to Servers
@@ -114,163 +185,234 @@ export function Alerts() {
     setTriage(alertId, current === state ? null : state);
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05, delayChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] }
+    }
+  };
+
   return (
     <ServerLayout>
-      <div className={styles.container}>
+      <motion.div 
+        className={styles.container}
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         {/* Header */}
-        <div className={styles.header}>
-          <div>
+        <motion.div className={styles.header} variants={itemVariants}>
+          <div className={styles.headerInfo}>
             <h1 className={styles.title}>Server Alerts</h1>
             <p className={styles.subtitle}>
               Monitoring {server.cameras.length} camera
               {server.cameras.length !== 1 ? 's' : ''}
               {lastUpdated && (
-                <span className={styles.updated}>
-                  {' '}
-                  · Updated {Math.floor((Date.now() - lastUpdated.getTime()) / 1000)}s ago
-                </span>
+                <motion.span 
+                  className={styles.updated}
+                  key={lastUpdated.getTime()}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  {' '}· Updated {Math.floor((Date.now() - lastUpdated.getTime()) / 1000)}s ago
+                </motion.span>
               )}
             </p>
           </div>
 
-          <div className={styles.severityCounts}>
-            <div className={`${styles.countBadge} ${styles.countHigh}`}>
-              High: {counts.high}
-            </div>
-            <div className={`${styles.countBadge} ${styles.countMedium}`}>
-              Medium: {counts.medium}
-            </div>
-            <div className={`${styles.countBadge} ${styles.countLow}`}>
-              Low: {counts.low}
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <GlassPanel className={styles.filters}>
-          <div className={styles.filterGroup}>
-            <label className={styles.filterLabel}>Time Window</label>
-            <select
-              value={timeFilter}
-              onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
-              className={styles.select}
-            >
-              <option value="5">Last 5 min</option>
-              <option value="60">Last 1 hour</option>
-              <option value="1440">Last 24 hours</option>
-              <option value="0">All time</option>
-            </select>
-          </div>
-
-          <div className={styles.filterGroup}>
-            <label className={styles.filterLabel}>Severity</label>
-            <select
-              value={severityFilter}
-              onChange={(e) =>
-                setSeverityFilter(e.target.value as Severity | 'all')
-              }
-              className={styles.select}
-            >
-              <option value="all">All</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-          </div>
-
-          <div className={`${styles.filterGroup} ${styles.filterSearch}`}>
-            <label className={styles.filterLabel}>Search</label>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="knife, gun..."
-              className={styles.searchInput}
+          {/* Severity chips */}
+          <div className={styles.severityChips}>
+            <SeverityChip 
+              severity="high" 
+              count={counts.high} 
+              active={severityFilter === 'high'}
+              onClick={() => setSeverityFilter(severityFilter === 'high' ? 'all' : 'high')}
+            />
+            <SeverityChip 
+              severity="medium" 
+              count={counts.medium}
+              active={severityFilter === 'medium'}
+              onClick={() => setSeverityFilter(severityFilter === 'medium' ? 'all' : 'medium')}
+            />
+            <SeverityChip 
+              severity="low" 
+              count={counts.low}
+              active={severityFilter === 'low'}
+              onClick={() => setSeverityFilter(severityFilter === 'low' ? 'all' : 'low')}
             />
           </div>
-        </GlassPanel>
+        </motion.div>
+
+        {/* Filters */}
+        <motion.div variants={itemVariants}>
+          <div className={styles.filters}>
+            <motion.div 
+              className={styles.filterPill}
+              whileHover={{ y: -2, boxShadow: '0 8px 25px rgba(0,0,0,0.3)' }}
+            >
+              <label className={styles.filterLabel}>Time</label>
+              <select
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
+                className={styles.select}
+              >
+                <option value="5">Last 5 min</option>
+                <option value="60">Last 1 hour</option>
+                <option value="1440">Last 24 hours</option>
+                <option value="0">All time</option>
+              </select>
+            </motion.div>
+
+            <motion.div 
+              className={`${styles.filterPill} ${styles.filterSearch}`}
+              whileHover={{ y: -2, boxShadow: '0 8px 25px rgba(0,0,0,0.3)' }}
+            >
+              <label className={styles.filterLabel}>Search</label>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="knife, gun, person..."
+                className={styles.searchInput}
+              />
+            </motion.div>
+          </div>
+        </motion.div>
 
         {/* Alerts list */}
         {isLoading ? (
-          <GlassPanel className={styles.loading}>
-            <div className={styles.spinner} />
-            <span>Loading alerts...</span>
-          </GlassPanel>
+          <motion.div variants={itemVariants}>
+            <GlassPanel className={styles.loading} glow>
+              <motion.div 
+                className={styles.spinner}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+              >
+                ◌
+              </motion.div>
+              <span>Loading alerts...</span>
+            </GlassPanel>
+          </motion.div>
         ) : filteredAlerts.length === 0 ? (
-          <GlassPanel className={styles.emptyState}>
-            <div className={styles.emptyIcon}>✓</div>
-            <h3>No alerts found</h3>
-            <p>No alerts match your current filters.</p>
-          </GlassPanel>
+          <motion.div variants={itemVariants}>
+            <GlassPanel className={styles.emptyState} glow>
+              <div className={styles.emptyIcon}>
+                ✓
+              </div>
+              <h3>No Alerts Detected</h3>
+              <p>Your cameras are monitoring. No threats have been detected.</p>
+            </GlassPanel>
+          </motion.div>
         ) : (
-          <div className={styles.alertsList}>
-            <AnimatePresence>
+          <div className={styles.alertsList} ref={listRef}>
+            <AnimatePresence mode="popLayout">
               {filteredAlerts.map((alert, index) => {
                 const triageState = getTriage(alert.id);
-                const isNew = index === 0 && Date.now() - new Date(alert.timestamp).getTime() < 10000;
+                const isNew = newAlertIds.has(alert.id);
+                const isHighNew = isNew && alert.severity === 'high';
 
                 return (
                   <motion.div
                     key={alert.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ delay: index * 0.02 }}
+                    initial={{ opacity: 0, y: -30, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: 50, scale: 0.95 }}
+                    transition={{ 
+                      delay: index * 0.02,
+                      duration: 0.4,
+                      ease: [0.4, 0, 0.2, 1]
+                    }}
+                    layout
                     className={`${styles.alertRow} ${
                       triageState === 'deny' ? styles.alertDenied : ''
-                    } ${isNew && alert.severity === 'high' ? styles.alertFlash : ''}`}
+                    } ${isHighNew ? styles.alertFlash : ''} ${isNew ? styles.alertNew : ''}`}
                   >
-                    <GlassPanel className={styles.alertCard}>
-                      <div className={styles.alertMain}>
-                        <div className={styles.alertTime}>
-                          {formatTime(alert.timestamp)}
+                    <motion.div 
+                      className={styles.alertCard}
+                      whileHover={{ scale: 1.01, y: -2 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {/* Flash indicator for high severity */}
+                      {isHighNew && <div className={styles.flashIndicator} />}
+                      
+                      {/* Separator line */}
+                      <div className={styles.alertSeparator} />
+                      
+                      <div className={styles.alertContent}>
+                        <div className={styles.alertMain}>
+                          <div className={styles.alertMeta}>
+                            <span className={styles.alertTime}>
+                              {formatTime(alert.timestamp)}
+                            </span>
+                            <span className={styles.alertCamera}>
+                              {alert.cameraId || 'Unknown'}
+                            </span>
+                          </div>
+                          <SeverityBadge severity={alert.severity} />
+                          <div className={styles.alertLabels}>
+                            {(alert.labels || []).map((label, i) => (
+                              <span key={i} className={styles.labelTag}>{label}</span>
+                            )) || <span className={styles.labelTag}>Detection</span>}
+                          </div>
                         </div>
-                        <SeverityBadge severity={alert.severity} />
-                        <div className={styles.alertCamera}>
-                          {alert.cameraId || 'Unknown'}
-                        </div>
-                        <div className={styles.alertLabels}>
-                          {(alert.labels || []).join(', ') || 'Detection'}
-                        </div>
-                      </div>
 
-                      <div className={styles.triageButtons}>
-                        <button
-                          className={`${styles.triageBtn} ${styles.triageAccept} ${
-                            triageState === 'accept' ? styles.triageActive : ''
-                          }`}
-                          onClick={() => handleTriageClick(alert.id, 'accept')}
-                        >
-                          Accept
-                        </button>
-                        <button
-                          className={`${styles.triageBtn} ${styles.triageReview} ${
-                            triageState === 'review' ? styles.triageActive : ''
-                          }`}
-                          onClick={() => handleTriageClick(alert.id, 'review')}
-                        >
-                          Review
-                        </button>
-                        <button
-                          className={`${styles.triageBtn} ${styles.triageDeny} ${
-                            triageState === 'deny' ? styles.triageActive : ''
-                          }`}
-                          onClick={() => handleTriageClick(alert.id, 'deny')}
-                        >
-                          Deny
-                        </button>
+                        {/* Triage buttons */}
+                        <div className={styles.triageButtons}>
+                          <motion.button
+                            className={`${styles.triageBtn} ${styles.triageAccept} ${
+                              triageState === 'accept' ? styles.triageActive : ''
+                            }`}
+                            onClick={() => handleTriageClick(alert.id, 'accept')}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            {triageState === 'accept' && <span className={styles.checkmark}>✓</span>}
+                            Accept
+                          </motion.button>
+                          <motion.button
+                            className={`${styles.triageBtn} ${styles.triageReview} ${
+                              triageState === 'review' ? styles.triageActive : ''
+                            }`}
+                            onClick={() => handleTriageClick(alert.id, 'review')}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            {triageState === 'review' && <span className={styles.checkmark}>✓</span>}
+                            Review
+                          </motion.button>
+                          <motion.button
+                            className={`${styles.triageBtn} ${styles.triageDeny} ${
+                              triageState === 'deny' ? styles.triageActive : ''
+                            }`}
+                            onClick={() => handleTriageClick(alert.id, 'deny')}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            {triageState === 'deny' && <span className={styles.checkmark}>✓</span>}
+                            Deny
+                          </motion.button>
+                        </div>
                       </div>
-                    </GlassPanel>
+                    </motion.div>
                   </motion.div>
                 );
               })}
             </AnimatePresence>
           </div>
         )}
-      </div>
+      </motion.div>
     </ServerLayout>
   );
 }
 
 export default Alerts;
-

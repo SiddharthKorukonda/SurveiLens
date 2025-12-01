@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GlassPanel, PrimaryButton, SecondaryButton } from '../components';
+import { GlassPanel, PrimaryButton } from '../components';
 import { useServers } from '../hooks/useServers';
 import { getStatus } from '../api/client';
 import type { LogEntry, LogLevel } from '../types';
@@ -18,17 +18,17 @@ export function Debug() {
   const [isPaused, setIsPaused] = useState(false);
   const [filter, setFilter] = useState<LogLevel | 'all'>('all');
   const [queuedLogs, setQueuedLogs] = useState<LogEntry[]>([]);
+  const [flashingLogs, setFlashingLogs] = useState<Set<string>>(new Set());
   
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const consoleBodyRef = useRef<HTMLDivElement>(null);
   const logIdRef = useRef(0);
 
-  // Generate unique log ID
   const generateLogId = () => {
     logIdRef.current += 1;
     return `log-${Date.now()}-${logIdRef.current}`;
   };
 
-  // Add a log entry
   const addLog = useCallback((level: LogLevel, message: string, data?: Record<string, unknown>) => {
     const entry: LogEntry = {
       id: generateLogId(),
@@ -38,6 +38,18 @@ export function Debug() {
       data,
     };
 
+    // Add flash effect for errors and alerts
+    if (level === 'error' || level === 'alert') {
+      setFlashingLogs(prev => new Set(prev).add(entry.id));
+      setTimeout(() => {
+        setFlashingLogs(prev => {
+          const next = new Set(prev);
+          next.delete(entry.id);
+          return next;
+        });
+      }, 1000);
+    }
+
     if (isPaused) {
       setQueuedLogs((prev) => [...prev, entry]);
     } else {
@@ -45,7 +57,6 @@ export function Debug() {
     }
   }, [isPaused]);
 
-  // Fetch status and log it
   useEffect(() => {
     if (!server) return;
 
@@ -53,7 +64,6 @@ export function Debug() {
       try {
         const status = await getStatus(server.baseUrl);
         
-        // Log status update
         const activeCameras = Object.values(status.cameras).filter((c) => c.running).length;
         addLog(
           'info',
@@ -61,7 +71,6 @@ export function Debug() {
           { status }
         );
 
-        // Check for alerts in status
         if (status.running) {
           Object.entries(status.cameras).forEach(([camId, camStatus]) => {
             if (camStatus.running) {
@@ -74,8 +83,7 @@ export function Debug() {
       }
     };
 
-    // Initial log
-    addLog('info', `Connected to ${server.baseUrl}`);
+    addLog('success', `Connected to ${server.baseUrl}`);
     addLog('info', `Server: ${server.name} | Cameras: ${server.cameras.length}`);
 
     fetchAndLog();
@@ -83,27 +91,27 @@ export function Debug() {
     return () => clearInterval(interval);
   }, [server, addLog]);
 
-  // Auto-scroll to bottom
+  // Smooth scroll to bottom
   useEffect(() => {
-    if (!isPaused && logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (!isPaused && consoleBodyRef.current) {
+      consoleBodyRef.current.scrollTo({
+        top: consoleBodyRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
     }
   }, [logs, isPaused]);
 
-  // Handle resume - flush queued logs
   const handleResume = () => {
     setLogs((prev) => [...prev, ...queuedLogs].slice(-500));
     setQueuedLogs([]);
     setIsPaused(false);
   };
 
-  // Clear logs
   const handleClear = () => {
     setLogs([]);
     setQueuedLogs([]);
   };
 
-  // Filter logs
   const filteredLogs = logs.filter((log) => {
     if (filter === 'all') return true;
     return log.level === filter;
@@ -112,7 +120,7 @@ export function Debug() {
   if (!server) {
     return (
       <ServerLayout>
-        <GlassPanel className={styles.errorPanel}>
+        <GlassPanel className={styles.errorPanel} glow>
           <h2>Server not found</h2>
           <PrimaryButton onClick={() => navigate('/servers')}>
             Back to Servers
@@ -145,11 +153,33 @@ export function Debug() {
     }
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1, delayChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] }
+    }
+  };
+
   return (
     <ServerLayout>
-      <div className={styles.container}>
+      <motion.div 
+        className={styles.container}
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         {/* Header */}
-        <div className={styles.header}>
+        <motion.div className={styles.header} variants={itemVariants}>
           <div>
             <h1 className={styles.title}>Debug Console</h1>
             <p className={styles.subtitle}>
@@ -158,95 +188,161 @@ export function Debug() {
           </div>
 
           <div className={styles.controls}>
-            <div className={styles.filterGroup}>
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as LogLevel | 'all')}
-                className={styles.select}
-              >
-                <option value="all">All</option>
-                <option value="info">Info</option>
-                <option value="error">Errors</option>
-                <option value="alert">Alerts</option>
-              </select>
+            {/* Filter buttons */}
+            <div className={styles.filterButtons}>
+              {(['all', 'info', 'error', 'alert'] as const).map((f) => (
+                <motion.button
+                  key={f}
+                  className={`${styles.filterBtn} ${filter === f ? styles.filterBtnActive : ''} ${styles[`filter${f.charAt(0).toUpperCase() + f.slice(1)}`]}`}
+                  onClick={() => setFilter(f)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+                </motion.button>
+              ))}
             </div>
 
-            <SecondaryButton
-              size="sm"
-              onClick={isPaused ? handleResume : () => setIsPaused(true)}
+            {/* Control buttons */}
+            <motion.div 
+              className={styles.controlButtons}
+              whileHover={{ scale: 1.02 }}
             >
-              {isPaused ? `Resume (${queuedLogs.length})` : 'Pause'}
-            </SecondaryButton>
-            <SecondaryButton size="sm" onClick={handleClear}>
-              Clear
-            </SecondaryButton>
+              <button
+                className={`${styles.iconBtn} ${isPaused ? styles.iconBtnActive : ''}`}
+                onClick={isPaused ? handleResume : () => setIsPaused(true)}
+                title={isPaused ? 'Resume' : 'Pause'}
+              >
+                {isPaused ? (
+                  <>
+                    <span className={styles.playIcon}>▶</span>
+                    <span className={styles.queueCount}>{queuedLogs.length}</span>
+                  </>
+                ) : (
+                  <span className={styles.pauseIcon}>❚❚</span>
+                )}
+              </button>
+              <button
+                className={styles.iconBtn}
+                onClick={handleClear}
+                title="Clear"
+              >
+                <span className={styles.clearIcon}>✕</span>
+              </button>
+            </motion.div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Console */}
-        <GlassPanel className={styles.console}>
-          <div className={styles.consoleHeader}>
-            <span className={styles.consoleTitle}>
-              <span className={styles.consoleDot} />
-              {server.name} — {server.baseUrl}
-            </span>
-            <span className={styles.logCount}>
-              {filteredLogs.length} entries
-              {isPaused && <span className={styles.pausedBadge}>PAUSED</span>}
-            </span>
-          </div>
-
-          <div className={styles.consoleBody}>
-            {filteredLogs.length === 0 ? (
-              <div className={styles.emptyConsole}>
-                <span>Waiting for logs...</span>
+        <motion.div variants={itemVariants}>
+          <div className={styles.console}>
+            {/* Console header */}
+            <div className={styles.consoleHeader}>
+              <div className={styles.consoleTitleArea}>
+                <motion.span 
+                  className={styles.consoleDot}
+                  animate={{ 
+                    backgroundColor: isPaused 
+                      ? ['#f59e0b', '#fbbf24', '#f59e0b'] 
+                      : ['#22c55e', '#4ade80', '#22c55e']
+                  }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                />
+                <span className={styles.consoleTitle}>
+                  {server.name}
+                </span>
+                <span className={styles.consoleUrl}>{server.baseUrl}</span>
               </div>
-            ) : (
-              <AnimatePresence initial={false}>
-                {filteredLogs.map((log) => (
-                  <motion.div
-                    key={log.id}
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className={`${styles.logEntry} ${getLevelClass(log.level)}`}
+              <div className={styles.consoleStats}>
+                <span className={styles.logCount}>
+                  {filteredLogs.length} entries
+                </span>
+                {isPaused && (
+                  <motion.span 
+                    className={styles.pausedBadge}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
                   >
-                    <span className={styles.logTime}>
-                      {formatTimestamp(log.timestamp)}
-                    </span>
-                    <span className={styles.logLevel}>[{log.level.toUpperCase()}]</span>
-                    <span className={styles.logMessage}>{log.message}</span>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            )}
-            <div ref={logsEndRef} />
+                    PAUSED
+                  </motion.span>
+                )}
+              </div>
+            </div>
+
+            {/* Console body */}
+            <div className={styles.consoleBody} ref={consoleBodyRef}>
+              {filteredLogs.length === 0 ? (
+                <div className={styles.emptyConsole}>
+                  <motion.span
+                    animate={{ opacity: [0.3, 0.7, 0.3] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    Waiting for logs...
+                  </motion.span>
+                  <span className={styles.cursor}>_</span>
+                </div>
+              ) : (
+                <AnimatePresence initial={false}>
+                  {filteredLogs.map((log) => (
+                    <motion.div
+                      key={log.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className={`${styles.logEntry} ${getLevelClass(log.level)} ${flashingLogs.has(log.id) ? styles.logFlash : ''}`}
+                    >
+                      <span className={styles.logTime}>
+                        {formatTimestamp(log.timestamp)}
+                      </span>
+                      <span className={styles.logLevel}>[{log.level.toUpperCase()}]</span>
+                      <span className={styles.logMessage}>{log.message}</span>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              )}
+              <div ref={logsEndRef} />
+            </div>
+
+            {/* Cursor indicator */}
+            <div className={styles.cursorLine}>
+              <motion.span 
+                className={styles.cursorIndicator}
+                animate={{ opacity: [1, 0, 1] }}
+                transition={{ duration: 1, repeat: Infinity }}
+              >
+                ▌
+              </motion.span>
+            </div>
           </div>
-        </GlassPanel>
+        </motion.div>
 
         {/* Quick stats */}
-        <div className={styles.stats}>
-          <GlassPanel className={styles.statCard}>
-            <div className={styles.statValue}>{logs.filter((l) => l.level === 'info').length}</div>
-            <div className={styles.statLabel}>Info</div>
-          </GlassPanel>
-          <GlassPanel className={styles.statCard}>
-            <div className={`${styles.statValue} ${styles.statError}`}>
-              {logs.filter((l) => l.level === 'error').length}
-            </div>
-            <div className={styles.statLabel}>Errors</div>
-          </GlassPanel>
-          <GlassPanel className={styles.statCard}>
-            <div className={`${styles.statValue} ${styles.statAlert}`}>
-              {logs.filter((l) => l.level === 'alert').length}
-            </div>
-            <div className={styles.statLabel}>Alerts</div>
-          </GlassPanel>
-        </div>
-      </div>
+        <motion.div className={styles.stats} variants={itemVariants}>
+          {[
+            { label: 'Info', level: 'info', color: 'cyan' },
+            { label: 'Success', level: 'success', color: 'green' },
+            { label: 'Errors', level: 'error', color: 'red' },
+            { label: 'Alerts', level: 'alert', color: 'amber' },
+          ].map((stat, i) => (
+            <motion.div
+              key={stat.level}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 + i * 0.1 }}
+            >
+              <GlassPanel className={`${styles.statCard} ${styles[`stat${stat.color.charAt(0).toUpperCase() + stat.color.slice(1)}`]}`}>
+                <div className={styles.statValue}>
+                  {logs.filter((l) => l.level === stat.level).length}
+                </div>
+                <div className={styles.statLabel}>{stat.label}</div>
+              </GlassPanel>
+            </motion.div>
+          ))}
+        </motion.div>
+      </motion.div>
     </ServerLayout>
   );
 }
 
 export default Debug;
-

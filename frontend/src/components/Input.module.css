@@ -1,72 +1,150 @@
+/* ============================================
+   Input Component
+   Floating label inputs with glow effects
+   ============================================ */
+
 .wrapper {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
 }
 
 .inputContainer {
   position: relative;
-  background: var(--color-glass);
-  border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
+  background: rgba(10, 15, 30, 0.5);
+  border-radius: var(--radius-lg);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: visible;
+  min-height: 56px;
 }
 
+.glass {
+  background: var(--color-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.textareaContainer {
+  min-height: 120px;
+}
+
+/* Icon */
+.icon {
+  position: absolute;
+  left: var(--space-md);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  z-index: 2;
+  transition: color 0.3s ease;
+}
+
+.active .icon {
+  color: var(--color-accent);
+}
+
+/* Input field */
 .input {
   width: 100%;
-  padding: var(--space-md) var(--space-md);
-  padding-top: calc(var(--space-md) + 0.5rem);
+  padding: 22px var(--space-md) 8px;
   font-family: var(--font-body);
   font-size: 1rem;
+  font-weight: 500;
   color: var(--color-text-primary);
   background: transparent;
   border: none;
   outline: none;
+  position: relative;
+  z-index: 1;
+  letter-spacing: 0.02em;
+}
+
+.input.hasIcon {
+  padding-left: calc(var(--space-md) + 28px);
 }
 
 .input::placeholder {
   color: transparent;
 }
 
+.input:-webkit-autofill,
+.input:-webkit-autofill:hover,
+.input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-text-primary);
+  -webkit-box-shadow: 0 0 0px 1000px rgba(10, 15, 30, 0.9) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Textarea specific */
 .textarea {
   min-height: 100px;
   resize: vertical;
+  padding-top: 28px;
 }
 
+/* Floating label */
 .label {
   position: absolute;
   left: var(--space-md);
-  top: 50%;
-  transform: translateY(-50%);
+  top: 18px;
+  transform-origin: left top;
   font-family: var(--font-body);
   font-size: 1rem;
+  font-weight: 500;
   color: var(--color-text-muted);
   pointer-events: none;
-  transition: all var(--transition-fast);
+  z-index: 2;
+  transition: color 0.3s ease;
 }
 
-.textarea + .label {
-  top: var(--space-md);
-  transform: none;
+.hasIconLabel {
+  left: calc(var(--space-md) + 28px);
 }
 
-.labelActive {
-  top: var(--space-xs);
-  transform: none;
-  font-size: 0.75rem;
+.textareaLabel {
+  top: var(--space-lg);
+}
+
+.active .label {
   color: var(--color-accent);
+  text-shadow: 0 0 10px var(--color-accent-glow);
 }
 
-.textarea ~ .labelActive {
-  top: var(--space-xs);
-}
-
+/* Border */
 .border {
   position: absolute;
   inset: 0;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   pointer-events: none;
-  transition: all var(--transition-fast);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.borderGlow {
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-accent),
+    transparent
+  );
+  background-size: 200% 100%;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  animation: borderGlowMove 2s linear infinite paused;
+}
+
+@keyframes borderGlowMove {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .inputContainer:hover .border {
@@ -75,26 +153,84 @@
 
 .active .border {
   border-color: var(--color-accent);
-  box-shadow: 0 0 10px var(--color-accent-glow);
+  box-shadow: 
+    0 0 15px var(--color-accent-glow),
+    inset 0 0 15px rgba(56, 189, 248, 0.05);
 }
 
+.active .borderGlow {
+  opacity: 0.5;
+  animation-play-state: running;
+}
+
+/* Focus line at bottom */
+.focusLine {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-accent),
+    var(--color-accent-secondary),
+    var(--color-accent),
+    transparent
+  );
+  transform-origin: center;
+  box-shadow: 0 0 10px var(--color-accent-glow);
+  z-index: 3;
+}
+
+/* Error state */
 .hasError .border {
   border-color: var(--color-danger);
 }
 
 .hasError.active .border {
+  box-shadow: 
+    0 0 15px var(--color-danger-glow),
+    inset 0 0 15px rgba(239, 68, 68, 0.05);
+}
+
+.hasError .focusLine {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-danger),
+    var(--color-danger-bright),
+    var(--color-danger),
+    transparent
+  );
   box-shadow: 0 0 10px var(--color-danger-glow);
 }
 
-.error {
-  font-size: 0.75rem;
+.hasError .label {
   color: var(--color-danger);
-  padding-left: var(--space-sm);
 }
 
+/* Error message */
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-danger);
+  padding-left: var(--space-md);
+}
+
+.error::before {
+  content: '⚠';
+  font-size: 0.7rem;
+}
+
+/* Hint message */
 .hint {
+  font-family: var(--font-body);
   font-size: 0.75rem;
   color: var(--color-text-muted);
-  padding-left: var(--space-sm);
+  padding-left: var(--space-md);
 }
-

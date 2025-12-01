@@ -1,32 +1,176 @@
+/* ============================================
+   Glass Panel Component
+   Futuristic translucent panels with effects
+   ============================================ */
+
 .panel {
+  position: relative;
   background: var(--color-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-lg);
-  box-shadow: var(--shadow-glass);
-  transition: all var(--transition-normal);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  transform-style: preserve-3d;
+  will-change: transform, box-shadow;
+  
+  /* Default neon color */
+  --panel-glow-color: rgba(56, 189, 248, 0.15);
+  --panel-border-glow: rgba(56, 189, 248, 0.4);
 }
 
-.panel:hover {
-  border-color: var(--color-border-strong);
+.content {
+  position: relative;
+  z-index: 2;
 }
+
+/* Reflection layer */
+.reflection {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.03) 30%,
+    transparent 50%
+  );
+  pointer-events: none;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+/* Dynamic glow that follows cursor */
+.dynamicGlow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+  transition: opacity 0.3s ease;
+}
+
+/* Animated border glow */
+.borderGlow {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--panel-border-glow),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: borderGlowMove 3s linear infinite;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 0;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: xor;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  padding: 1px;
+}
+
+@keyframes borderGlowMove {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ============================================
+   Variants
+   ============================================ */
 
 .strong {
   background: var(--color-glass-strong);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
 }
 
 .light {
   background: var(--color-glass-light);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
+.subtle {
+  background: rgba(10, 15, 30, 0.3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-color: rgba(56, 189, 248, 0.08);
+}
+
+/* ============================================
+   Hover Effects
+   ============================================ */
+
+.hoverable:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: 
+    0 16px 48px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(56, 189, 248, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* ============================================
+   Glow Effect
+   ============================================ */
+
 .glow {
-  box-shadow: var(--shadow-glass), 0 0 0 1px var(--color-border);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px var(--color-border),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .glow:hover {
-  box-shadow: var(--shadow-glass), var(--shadow-glow);
-  border-color: var(--color-border-glow);
+  border-color: var(--panel-border-glow);
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 30px var(--panel-glow-color),
+    0 0 60px var(--panel-glow-color),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
+.glow:hover .borderGlow {
+  opacity: 1;
+}
+
+/* ============================================
+   Neon Color Variants
+   ============================================ */
+
+.neon-cyan {
+  --panel-glow-color: rgba(56, 189, 248, 0.15);
+  --panel-border-glow: rgba(56, 189, 248, 0.5);
+}
+
+.neon-purple {
+  --panel-glow-color: rgba(167, 139, 250, 0.15);
+  --panel-border-glow: rgba(167, 139, 250, 0.5);
+}
+
+.neon-green {
+  --panel-glow-color: rgba(34, 197, 94, 0.15);
+  --panel-border-glow: rgba(34, 197, 94, 0.5);
+}
+
+.neon-red {
+  --panel-glow-color: rgba(239, 68, 68, 0.15);
+  --panel-border-glow: rgba(239, 68, 68, 0.5);
+}
+
+.neon-amber {
+  --panel-glow-color: rgba(245, 158, 11, 0.15);
+  --panel-border-glow: rgba(245, 158, 11, 0.5);
+}

@@ -20,12 +20,14 @@ interface StreamConnection {
   bytesPrev: number;
   timePrev: number;
   statsInterval: number | null;
+  manuallyStopped: boolean;  // Track if user manually stopped the stream
 }
 
 // Global state
 const connections = new Map<StreamKey, StreamConnection>();
 const listeners = new Set<() => void>();
 const videoElements = new Map<StreamKey, HTMLVideoElement>();
+const manuallyStoppedStreams = new Set<StreamKey>();  // Track manually stopped streams
 
 const ICE_SERVERS = [{ urls: ['stun:stun.l.google.com:19302'] }];
 
@@ -95,6 +97,12 @@ function stopStats(conn: StreamConnection) {
   }
 }
 
+// Check if a stream was manually stopped
+function isStreamManuallyStopped(serverId: string, cameraId: CameraId): boolean {
+  const key = createStreamKey(serverId, cameraId);
+  return manuallyStoppedStreams.has(key);
+}
+
 // Connect to a stream
 function connectStream(
   serverId: string,
@@ -104,6 +112,9 @@ function connectStream(
   room: string
 ): void {
   const key = createStreamKey(serverId, cameraId);
+
+  // Clear manually stopped flag when user explicitly connects
+  manuallyStoppedStreams.delete(key);
 
   // Check if already connected or connecting
   const existing = connections.get(key);
@@ -129,6 +140,7 @@ function connectStream(
     bytesPrev: 0,
     timePrev: 0,
     statsInterval: null,
+    manuallyStopped: false,
   };
 
   connections.set(key, conn);
@@ -261,16 +273,20 @@ function connectStream(
 }
 
 // Disconnect a stream
-function disconnectStream(serverId: string, cameraId: CameraId): void {
+function disconnectStream(serverId: string, cameraId: CameraId, manual: boolean = true): void {
   const key = createStreamKey(serverId, cameraId);
   const conn = connections.get(key);
 
   if (!conn) {
     console.log('[StreamManager] No connection to disconnect:', key);
+    // Even if no connection exists, mark as manually stopped to prevent auto-reconnect
+    if (manual) {
+      manuallyStoppedStreams.add(key);
+    }
     return;
   }
 
-  console.log('[StreamManager] Disconnecting:', key);
+  console.log('[StreamManager] Disconnecting:', key, manual ? '(manual)' : '(auto)');
 
   stopStats(conn);
 
@@ -296,6 +312,7 @@ function disconnectStream(serverId: string, cameraId: CameraId): void {
   conn.status = 'disconnected';
   conn.error = null;
   conn.bitrate = null;
+  conn.manuallyStopped = manual;
 
   // Remove video element reference
   const video = videoElements.get(key);
@@ -303,6 +320,11 @@ function disconnectStream(serverId: string, cameraId: CameraId): void {
     video.srcObject = null;
   }
   videoElements.delete(key);
+
+  // Track manually stopped streams
+  if (manual) {
+    manuallyStoppedStreams.add(key);
+  }
 
   connections.delete(key);
   notifyListeners();
@@ -366,6 +388,7 @@ export function useStreamManager() {
     registerVideo: registerVideoElement,
     getConnection,
     getAllConnections: () => connections,
+    isManuallyStopped: isStreamManuallyStopped,
   };
 }
 
@@ -380,6 +403,7 @@ export function useManagedCameraStream(
 ) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const manager = useStreamManager();
+  const hasInitialized = useRef(false);
 
   // Register video element when ref changes
   useEffect(() => {
@@ -390,10 +414,20 @@ export function useManagedCameraStream(
     };
   }, [serverId, cameraId, manager]);
 
-  // Auto-connect on mount if enabled
+  // Auto-connect on mount if enabled and not manually stopped
   useEffect(() => {
-    if (autoConnect) {
+    // Only auto-connect once on initial mount
+    if (autoConnect && !hasInitialized.current) {
+      hasInitialized.current = true;
       const conn = manager.getConnection(serverId, cameraId);
+      const wasManuallyStopped = manager.isManuallyStopped(serverId, cameraId);
+      
+      // Don't auto-connect if user manually stopped the stream
+      if (wasManuallyStopped) {
+        console.log('[useManagedCameraStream] Stream was manually stopped, not auto-connecting:', serverId, cameraId);
+        return;
+      }
+      
       if (!conn || conn.status === 'disconnected' || conn.status === 'error') {
         manager.connect(serverId, cameraId, baseUrl, token, room);
       }
@@ -401,19 +435,21 @@ export function useManagedCameraStream(
   }, [serverId, cameraId, baseUrl, token, room, autoConnect, manager]);
 
   const connection = manager.getConnection(serverId, cameraId);
+  const isManuallyStopped = manager.isManuallyStopped(serverId, cameraId);
 
   const connect = useCallback(() => {
     manager.connect(serverId, cameraId, baseUrl, token, room);
   }, [serverId, cameraId, baseUrl, token, room, manager]);
 
   const disconnect = useCallback(() => {
-    manager.disconnect(serverId, cameraId);
+    manager.disconnect(serverId, cameraId, true);  // true = manual disconnect
   }, [serverId, cameraId, manager]);
 
   return {
     videoRef,
     isConnecting: connection?.status === 'connecting',
     isConnected: connection?.status === 'connected',
+    isManuallyStopped,
     error: connection?.error || null,
     bitrate: connection?.bitrate || null,
     connect,
