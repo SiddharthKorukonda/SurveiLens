@@ -9,19 +9,26 @@ from typing import Dict, Optional, Literal
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from fractions import Fraction
+from uuid import uuid4
 from aiortc import RTCPeerConnection, RTCSessionDescription, MediaStreamTrack
 from aiortc.contrib.media import MediaRelay
 from av import VideoFrame
 
+from heuristics import HeuristicEngine
+
 # ---------- paths / constants ----------
 BASE_DIR = Path(__file__).resolve().parent
+UPLOADS_DIR = BASE_DIR / "uploads"
+UPLOADS_DIR.mkdir(exist_ok=True)
+FILE_CAMERA_ID = "upload"
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv"}
 
 # ---------- YOLO ----------
 try:
@@ -50,23 +57,67 @@ YOLO_DEVICE = os.getenv("YOLO_DEVICE", None)
 
 # Danger label config
 DANGER_CONFIG = {
-    "HIGH": {"knife", "gun", "pistol", "rifle", "revolver", "firearm"},
+    "HIGH": {
+        "knife",
+        "gun",
+        "pistol",
+        "rifle",
+        "revolver",
+        "firearm",
+        "atm_fraud",
+        "atm fraud",
+        "atm tampering",
+        "atm_attack",
+        "atm attack",
+        "atm theft",
+        "atm_scam",
+        "atm scam",
+        "atm skimmer",
+        "bank robbery",
+        "bank_fraud",
+        "bank fraud",
+        "robbery",
+        "theft",
+        "armed robbery",
+    },
     "MEDIUM": {"scissors"},
 }
 COLORS = {"LOW": (60, 180, 75), "MEDIUM": (0, 215, 255), "HIGH": (0, 0, 255)}
 
 # Camera IDs
-CameraId = Literal["cam1", "cam2", "cam3", "cam4"]
-VALID_CAMERA_IDS = {"cam1", "cam2", "cam3", "cam4"}
+CameraId = Literal["cam1", "cam2", "cam3", "cam4", "upload"]
+VALID_CAMERA_IDS = {"cam1", "cam2", "cam3", "cam4", "upload"}
+
+
+def _resolve_camera_profile(camera_id: str) -> str:
+    env_key = f"{camera_id.upper()}_PROFILE"
+    if camera_id == FILE_CAMERA_ID:
+        default = os.getenv("UPLOAD_CAMERA_PROFILE", "ATM")
+    else:
+        default = os.getenv("CAMERA_DEFAULT_PROFILE", "GENERIC")
+    return os.getenv(env_key, default).upper()
 
 def canonical(s: str) -> str:
     return s.strip().lower()
 
 def danger_level_for_label(name: str) -> str:
     n = canonical(name)
+    if not n:
+        return "LOW"
     if n in DANGER_CONFIG["HIGH"]:
         return "HIGH"
     if n in DANGER_CONFIG["MEDIUM"]:
+        return "MEDIUM"
+    # Substring heuristics to catch ATM fraud variations and similar behaviors
+    if "atm" in n and (
+        "fraud" in n or "tamper" in n or "attack" in n or "theft" in n or "scam" in n
+    ):
+        return "HIGH"
+    if "robbery" in n or "theft" in n:
+        return "HIGH"
+    if "weapon" in n:
+        return "HIGH"
+    if "suspicious" in n or "loiter" in n:
         return "MEDIUM"
     return "LOW"
 
@@ -113,6 +164,7 @@ camera_states: Dict[str, CameraState] = {
     "cam2": CameraState(),
     "cam3": CameraState(),
     "cam4": CameraState(),
+    FILE_CAMERA_ID: CameraState(),
 }
 
 # Per-camera captures and locks
@@ -122,10 +174,29 @@ cap_locks: Dict[str, asyncio.Lock] = {
     "cam2": asyncio.Lock(),
     "cam3": asyncio.Lock(),
     "cam4": asyncio.Lock(),
+    FILE_CAMERA_ID: asyncio.Lock(),
 }
 
 # Per-camera YOLO models (lazy loaded)
 yolo_models: Dict[str, any] = {}
+
+# Camera behavior profiles and heuristic engines
+camera_profiles: Dict[str, str] = {cid: _resolve_camera_profile(cid) for cid in VALID_CAMERA_IDS}
+heuristic_engines: Dict[str, Optional[HeuristicEngine]] = {}
+
+# Uploaded video registry
+uploaded_videos: Dict[str, dict] = {}
+active_upload_video_id: Optional[str] = None
+
+
+def _ensure_heuristic_engine(camera_id: str):
+    profile = camera_profiles.get(camera_id, "GENERIC")
+    if profile in {"ATM", "PARKING"}:
+        engine = heuristic_engines.get(camera_id)
+        if engine is None or engine.camera_type != profile:
+            heuristic_engines[camera_id] = HeuristicEngine(profile)
+    else:
+        heuristic_engines.pop(camera_id, None)
 
 def _get_yolo_model(weights: str):
     """Get or load a YOLO model for given weights."""
@@ -232,6 +303,47 @@ def _write_alert(alert_data: dict):
     except Exception as e:
         print(f"[WARN] Failed to write alert: {e}")
 
+def _sanitize_filename(name: str) -> str:
+    """Return a filesystem-safe version of an uploaded filename."""
+    if not name:
+        return "video"
+    base = Path(name).name
+    cleaned = "".join(ch if ch.isalnum() or ch in {" ", ".", "_", "-"} else "_" for ch in base)
+    cleaned = cleaned.strip().strip("_")
+    return cleaned or "video"
+
+def _serialize_uploaded_video(meta: dict) -> dict:
+    """Prepare uploaded video metadata for API responses."""
+    return {
+        "video_id": meta["video_id"],
+        "filename": meta["filename"],
+        "stored_filename": meta["stored_filename"],
+        "size_bytes": meta["size_bytes"],
+        "uploaded_at": meta["uploaded_at"],
+        "camera_id": meta["camera_id"],
+        "status": meta.get("status", "uploaded"),
+        "last_started_at": meta.get("last_started_at"),
+        "last_stopped_at": meta.get("last_stopped_at"),
+        "active": (active_upload_video_id == meta["video_id"]),
+    }
+
+def _get_video_meta(video_id: str) -> dict:
+    meta = uploaded_videos.get(video_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail=f"Video {video_id} not found")
+    return meta
+
+def _mark_upload_camera_stopped():
+    """Update metadata when the upload camera stops streaming."""
+    global active_upload_video_id
+    if not active_upload_video_id:
+        return
+    meta = uploaded_videos.get(active_upload_video_id)
+    if meta:
+        meta["status"] = "stopped"
+        meta["last_stopped_at"] = datetime.utcnow().isoformat() + "Z"
+    active_upload_video_id = None
+
 def _start_capture(camera_id: str, source, weights: str, conf: float):
     """Start capture for a specific camera."""
     global caps, camera_states
@@ -242,6 +354,8 @@ def _start_capture(camera_id: str, source, weights: str, conf: float):
     state = camera_states[camera_id]
     if state.running:
         return  # Already running
+
+    _ensure_heuristic_engine(camera_id)
     
     # Parse source
     try:
@@ -285,6 +399,7 @@ def _stop_capture(camera_id: Optional[str] = None):
         if camera_id in camera_states:
             camera_states[camera_id].running = False
             camera_states[camera_id].started_at = None
+        heuristic_engines.pop(camera_id, None)
         print(f"[INFO] Stopped camera {camera_id}")
     else:
         # Stop all cameras
@@ -297,6 +412,7 @@ def _stop_capture(camera_id: Optional[str] = None):
         for state in camera_states.values():
             state.running = False
             state.started_at = None
+        heuristic_engines.clear()
         print("[INFO] Stopped all cameras")
 
 # ---------- request bodies ----------
@@ -308,6 +424,10 @@ class StartBody(BaseModel):
 
 class StopBody(BaseModel):
     camera_id: Optional[str] = None  # None = stop all
+
+class VideoStartBody(BaseModel):
+    conf: Optional[float] = None
+    yolo_weights: Optional[str] = None
 
 # ---------- WebRTC video track ----------
 class CameraVideoTrack(MediaStreamTrack):
@@ -343,15 +463,31 @@ class CameraVideoTrack(MediaStreamTrack):
             else:
                 ok, img = cap.read()
                 if not ok or img is None:
-                    h, w = 480, 640
-                    img = np.zeros((h, w, 3), dtype=np.uint8)
-                    cv2.putText(img, f"Camera {self.camera_id}: Read Error", (50, 240),
-                               cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 100, 100), 2, cv2.LINE_AA)
+                    # Attempt to restart file-based captures (e.g., uploaded mp4)
+                    source_path = state.source or ""
+                    reopened = False
+                    if isinstance(source_path, str) and os.path.isfile(source_path):
+                        try:
+                            cap.release()
+                        except Exception:
+                            pass
+                        new_cap = cv2.VideoCapture(source_path)
+                        caps[self.camera_id] = new_cap
+                        cap = new_cap
+                        ok, img = new_cap.read()
+                        reopened = ok and img is not None
+                    if not reopened:
+                        h, w = 480, 640
+                        img = np.zeros((h, w, 3), dtype=np.uint8)
+                        cv2.putText(img, f"Camera {self.camera_id}: Read Error", (50, 240),
+                                   cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 100, 100), 2, cv2.LINE_AA)
 
         # ----- YOLO inference & drawing -----
         hazards = []
         detected_labels = []
-        
+        detections_for_rules = []
+        danger_overlay_text = None
+
         if state and state.running:
             yolo = _get_yolo_model(state.yolo_weights)
             if yolo is not None:
@@ -364,6 +500,11 @@ class CameraVideoTrack(MediaStreamTrack):
                             label = names.get(cls_id, str(cls_id)) if isinstance(names, dict) else str(cls_id)
                             conf_val = float(box.conf.item()) if box.conf is not None else 0.0
                             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+                            detections_for_rules.append({
+                                "bbox": (x1, y1, x2, y2),
+                                "conf": conf_val,
+                                "class_name": label,
+                            })
                             level = danger_level_for_label(label)
                             hazards.append(level)
                             detected_labels.append(label)
@@ -376,11 +517,30 @@ class CameraVideoTrack(MediaStreamTrack):
                     cv2.putText(img, f"YOLO error: {type(e).__name__}",
                                 (10, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2, cv2.LINE_AA)
 
+        heuristic = heuristic_engines.get(self.camera_id)
+        heuristic_result = None
+        if heuristic:
+            try:
+                heuristic_result = heuristic.process_frame(img, detections_for_rules, time.time())
+            except Exception as e:
+                print(f"[WARN] Heuristic engine error for {self.camera_id}: {e}")
+                heuristic_result = None
+
+        if heuristic_result:
+            heur_level = heuristic_result.get("danger_level")
+            heur_labels = heuristic_result.get("labels") or []
+            if heur_level in {"HIGH", "MEDIUM"}:
+                hazards.append(heur_level)
+            detected_labels.extend(heur_labels)
+            if heuristic_result.get("overlay_text"):
+                danger_overlay_text = heuristic_result["overlay_text"]
+
         frame_level = highest_danger_level(hazards)
         
         # Generate alert for HIGH danger
         if frame_level == "HIGH":
-            img = overlay_safe(img, "DANGEROUS OBJECT DETECTED", color=COLORS["HIGH"], alpha=0.35)
+            overlay_text = danger_overlay_text or "DANGEROUS OBJECT DETECTED"
+            img = overlay_safe(img, overlay_text, color=COLORS["HIGH"], alpha=0.35)
             
             # Write alert with cooldown
             current_time = time.time()
@@ -485,6 +645,9 @@ def api_stop(body: StopBody | None = None):
     
     _stop_capture(camera_id)
     
+    if camera_id is None or camera_id == FILE_CAMERA_ID:
+        _mark_upload_camera_stopped()
+    
     # Close WebRTC connections for stopped cameras
     rooms_to_close = []
     for room_key in list(rooms.keys()):
@@ -507,6 +670,123 @@ def api_stop(body: StopBody | None = None):
 def api_status():
     """Get status of all cameras."""
     return _status_payload()
+
+# ---------- Uploaded video processing ----------
+@app.post("/videos/upload")
+async def api_upload_video(file: UploadFile = File(...)):
+    """Upload an MP4 (or similar) file for offline detection."""
+    if not file:
+        raise HTTPException(status_code=400, detail="No file provided")
+    
+    original_name = file.filename or "video.mp4"
+    filename = _sanitize_filename(original_name)
+    ext = Path(original_name).suffix.lower()
+    
+    if ext not in ALLOWED_VIDEO_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Unsupported video type: {ext or 'unknown'}")
+    
+    video_id = uuid4().hex
+    stored_name = f"{video_id}{ext}"
+    dest_path = UPLOADS_DIR / stored_name
+    size = 0
+    
+    try:
+        with dest_path.open("wb") as buffer:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                buffer.write(chunk)
+                size += len(chunk)
+    except Exception as e:
+        if dest_path.exists():
+            try:
+                dest_path.unlink()
+            except Exception:
+                pass
+        raise HTTPException(status_code=500, detail=f"Failed to save video: {e}")
+    finally:
+        await file.close()
+    
+    uploaded_at = datetime.utcnow().isoformat() + "Z"
+    meta = {
+        "video_id": video_id,
+        "filename": filename,
+        "stored_filename": stored_name,
+        "stored_path": str(dest_path),
+        "size_bytes": size,
+        "uploaded_at": uploaded_at,
+        "camera_id": FILE_CAMERA_ID,
+        "status": "uploaded",
+    }
+    uploaded_videos[video_id] = meta
+    print(f"[INFO] Uploaded video {video_id}: {filename} ({size} bytes)")
+    return _serialize_uploaded_video(meta)
+
+@app.get("/videos/uploads")
+def api_list_uploaded_videos():
+    """List uploaded videos available for detection."""
+    items = list(uploaded_videos.values())
+    items.sort(key=lambda m: m["uploaded_at"], reverse=True)
+    return [_serialize_uploaded_video(meta) for meta in items]
+
+@app.get("/videos/uploads/{video_id}")
+def api_get_uploaded_video(video_id: str):
+    """Get metadata about a single uploaded video."""
+    meta = _get_video_meta(video_id)
+    return _serialize_uploaded_video(meta)
+
+@app.post("/videos/uploads/{video_id}/start")
+def api_start_uploaded_video(video_id: str, body: VideoStartBody | None = None):
+    """Start detection on an uploaded video via the virtual 'upload' camera."""
+    global active_upload_video_id
+    meta = _get_video_meta(video_id)
+    stored_path = meta.get("stored_path")
+    if not stored_path or not os.path.isfile(stored_path):
+        raise HTTPException(status_code=404, detail="Stored video file not found on server")
+    
+    conf = body.conf if body and body.conf is not None else meta.get("conf", DEFAULT_CONF)
+    weights = body.yolo_weights if body and body.yolo_weights else meta.get("yolo_weights", DEFAULT_WEIGHTS)
+    
+    # Stop any existing upload camera stream before starting a new one
+    _stop_capture(FILE_CAMERA_ID)
+    _mark_upload_camera_stopped()
+    
+    try:
+        _start_capture(FILE_CAMERA_ID, stored_path, weights, conf)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    meta["status"] = "processing"
+    meta["last_started_at"] = datetime.utcnow().isoformat() + "Z"
+    meta["conf"] = conf
+    meta["yolo_weights"] = weights
+    active_upload_video_id = video_id
+    
+    return {
+        "message": "started",
+        "camera_id": FILE_CAMERA_ID,
+        "video": _serialize_uploaded_video(meta),
+        "pipeline": _status_payload(),
+    }
+
+@app.post("/videos/uploads/{video_id}/stop")
+def api_stop_uploaded_video(video_id: str):
+    """Stop detection for the uploaded video camera."""
+    meta = _get_video_meta(video_id)
+    _stop_capture(FILE_CAMERA_ID)
+    _mark_upload_camera_stopped()
+    
+    if meta.get("status") != "uploaded":
+        meta["status"] = "stopped"
+        meta["last_stopped_at"] = datetime.utcnow().isoformat() + "Z"
+    
+    return {
+        "message": "stopped",
+        "camera_id": FILE_CAMERA_ID,
+        "video": _serialize_uploaded_video(meta),
+        "pipeline": _status_payload(),
+    }
 
 @app.get("/camera/{camera_id}/status")
 def api_camera_status(camera_id: str):
