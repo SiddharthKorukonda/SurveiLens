@@ -382,8 +382,10 @@ export function Stream() {
   };
 
   const cameraCount = server.cameras.length;
-  const anyRunning = status?.running ?? false;
-  const runningCount = status ? Object.values(status.cameras).filter(c => c.running).length : 0;
+  const runningCount = server.cameras.filter(
+    (cam) => status?.cameras?.[cam.id]?.running
+  ).length;
+  const anyRunning = runningCount > 0;
 
   const getGridClass = useCallback(() => {
     if (cameraCount === 1) return styles.gridSingle;

@@ -8,6 +8,7 @@ import {
   Alerts,
   Debug,
   Edit,
+  VideoUpload,
 } from './routes';
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
           <Route path="/servers/:serverId/alerts" element={<Alerts />} />
           <Route path="/servers/:serverId/debug" element={<Debug />} />
           <Route path="/servers/:serverId/edit" element={<Edit />} />
+          <Route path="/servers/:serverId/upload" element={<VideoUpload />} />
         </Routes>
       </Layout>
     </BrowserRouter>

@@ -17,6 +17,7 @@ export function ServerLayout({ children }: ServerLayoutProps) {
 
   const tabs = [
     { path: 'stream', label: 'Stream', icon: '▶' },
+    { path: 'upload', label: 'Upload', icon: '⬆' },
     { path: 'alerts', label: 'Alerts', icon: '⚠' },
     { path: 'debug', label: 'Debug', icon: '⌘' },
     { path: 'edit', label: 'Edit', icon: '✎' },

@@ -1,5 +1,5 @@
 // Camera and Server types
-export type CameraId = 'cam1' | 'cam2' | 'cam3' | 'cam4';
+export type CameraId = 'cam1' | 'cam2' | 'cam3' | 'cam4' | 'upload';
 
 export interface CameraConfig {
   id: CameraId;
@@ -18,6 +18,22 @@ export interface ServerConfig {
   cameras: CameraConfig[];
   createdAt: string;
   updatedAt: string;
+}
+
+// Uploaded video types
+export type UploadedVideoStatus = 'uploaded' | 'processing' | 'stopped';
+
+export interface UploadedVideo {
+  videoId: string;
+  filename: string;
+  storedFilename: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  cameraId: CameraId;
+  status: UploadedVideoStatus;
+  lastStartedAt?: string;
+  lastStoppedAt?: string;
+  active: boolean;
 }
 
 // Alert types
